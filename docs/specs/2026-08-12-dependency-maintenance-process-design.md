@@ -92,6 +92,9 @@ Extending the `github-actions` manager to `.gitea/workflows/` is load-bearing. T
 | Flutter SDK pin | **Review** | Review |
 | `flutterpi_tool` | **Review** | Review |
 | Fork tags (`flutter-pi-hearth`, plugin fork) | **Review** | Review |
+| Android Gradle deps, Gradle wrapper | **Review** | Review |
+
+**Android carve-out (added 2026-10-19).** PR CI does not build the APK, so a green check says nothing about an Android Gradle bump; `flutter build apk --debug` is the check. The Kotlin Gradle plugins and libraries are one `kotlin` group, majors included — the one exception to "each major its own PR" — because split bumps conflicted on adjacent lines and left `main` on mixed Kotlin versions (#300, #301).
 
 **Rationale for the toolchain carve-out.** Package automerge is safe because Hearth's customizations are small and its API surfaces are narrow. That reasoning does not transfer to the Flutter SDK, because the risk there is not a function of how much Hearth has customized — it is a third-party release-cadence coupling. `flutterpi_tool` can only build a Flutter version once ardera publishes matching arm64 engine binaries, and that lags:
 

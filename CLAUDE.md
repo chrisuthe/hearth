@@ -135,6 +135,9 @@ The default branch is `main`. All PRs target `main`.
 Renovate runs weekly on Gitea Actions (`.gitea/workflows/renovate.yml`, config
 in `renovate.json`). Packages and Actions automerge on green CI. The Flutter
 pin, `dart`, `flutterpi_tool`, and the three fork tags never automerge.
+Neither do Android Gradle deps or the Gradle wrapper: PR CI does not build the
+APK, so run `flutter build apk --debug` before merging one. The Kotlin plugins
+and libraries are grouped into one `kotlin` PR so they never split versions.
 
 **The Flutter pin is not independent.** `flutterpi_tool` must ship arm64 engine
 support before the Pi can build a given Flutter version, and that has lagged by
