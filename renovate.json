@@ -102,6 +102,17 @@
       "matchUpdateTypes": ["major"],
       "automerge": false,
       "groupName": null
+    },
+    {
+      "description": "Android Gradle deps and the Gradle wrapper are never automerged. PR CI (build.yml) does not build the APK — only tags, manual runs and the weekly canary do — so a green check proves nothing about them. Run `flutter build apk --debug` before merging.",
+      "matchManagers": ["gradle", "gradle-wrapper"],
+      "automerge": false
+    },
+    {
+      "description": "The Kotlin Gradle plugins (android, jvm, multiplatform, plugin.serialization) and Kotlin libraries move as one PR. Split, each PR conflicts with the last on adjacent lines of android/settings.gradle.kts and main sits on mixed versions in between; the serialization compiler plugin must match the compiler. config:recommended's monorepo grouping did not catch them: 2.4.21 arrived as four separate PRs (#300, #301, …). Must stay below the majors rule so a Kotlin major is grouped too. The regex stops at [.:] so org.jetbrains.kotlinx is not included.",
+      "matchManagers": ["gradle"],
+      "matchPackageNames": ["/^org\\.jetbrains\\.kotlin[.:]/"],
+      "groupName": "kotlin"
     }
   ]
 }
