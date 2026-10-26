@@ -45,50 +45,50 @@ packages:
     dependency: "direct main"
     description:
       name: bonsoir
-      sha256: "20fed01e4616e625f4bafd9007ff899d231d8d79bebc8564853fa1e3570294a6"
+      sha256: "5a16185a921039a6cc6544e5f6539c989e8d8a7dc3b219a3bcbd583b1cb302f7"
       url: "https://pub.dev"
     source: hosted
-    version: "7.1.5"
+    version: "7.1.6"
   bonsoir_android:
     dependency: transitive
     description:
       name: bonsoir_android
-      sha256: "0dda1164e826553b8ee90a3fd1aabd462d17f19348f542b95f9d5b5455e4157f"
+      sha256: "543689dae95e8d4df3576afadd1f8a343e0c2760ae44e5095959d870cfbcb7d3"
       url: "https://pub.dev"
     source: hosted
-    version: "7.1.3"
+    version: "7.1.4"
   bonsoir_darwin:
     dependency: transitive
     description:
       name: bonsoir_darwin
-      sha256: "6f695a0b4465514b75fc1a457746ab6dfc10d7180f0d04810fd9512e6520df69"
+      sha256: "5fceef2e607db0b63fc7a51fe3c0e4da66ec77e2896acc697bb531cf48b8df0a"
       url: "https://pub.dev"
     source: hosted
-    version: "7.1.1"
+    version: "7.1.2"
   bonsoir_linux:
     dependency: transitive
     description:
       name: bonsoir_linux
-      sha256: "9afae7bb9509c5bd20a0ea2ca02a0f2b1ef09cca1ceb2ea288ed58a0f03d1e11"
+      sha256: b3ead464c679651940ba378d38720574b1bfdf9a5b0e8cb2d4480416e1e1b5a5
       url: "https://pub.dev"
     source: hosted
-    version: "7.1.0"
+    version: "7.1.1"
   bonsoir_platform_interface:
     dependency: transitive
     description:
       name: bonsoir_platform_interface
-      sha256: "6c55c786b01ad279f675ae72cea3a885aa746e416d2e8c1f0c46e9d2c06420b0"
+      sha256: c08af1733b6ec3bb109e08855f91da6fee52fe57cb6033be2fd6648a74f94de0
       url: "https://pub.dev"
     source: hosted
-    version: "7.0.0"
+    version: "7.0.1"
   bonsoir_windows:
     dependency: transitive
     description:
       name: bonsoir_windows
-      sha256: aaabbb652fe68d3eb26a9b2cddefaae26cd9ca6ebe737d476ab9ed535c7c2516
+      sha256: "22ca4c5dcba2b95fcedb723132a5d65930df3d69634f169eb327c366c9f89151"
       url: "https://pub.dev"
     source: hosted
-    version: "7.3.0"
+    version: "7.3.1"
   boolean_selector:
     dependency: transitive
     description:
@@ -125,10 +125,10 @@ packages:
     dependency: "direct main"
     description:
       name: cached_network_image
-      sha256: "64a6c35e63cfd22865238d11fe8608bb538306ece5b2eb951106280441fdbb0c"
+      sha256: "775542110bd3f668c41f9b6d0b4e3c51b1f6c267096739e91667ed4c34479bb9"
       url: "https://pub.dev"
     source: hosted
-    version: "4.0.4"
+    version: "4.0.5"
   cached_network_image_platform_interface:
     dependency: transitive
     description:
@@ -237,10 +237,10 @@ packages:
     dependency: transitive
     description:
       name: dbus
-      sha256: "0ce9b0a839e6dee59a37a623d2fc26a35bbbe6404213e419b0d6411023d62645"
+      sha256: f7db8504e715b835f5ebe5fe74604ccd961d504c73389a5d8e81bafc2e2f3612
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.14"
+    version: "0.8.0"
   dio:
     dependency: "direct main"
     description:
@@ -1048,18 +1048,18 @@ packages:
     dependency: transitive
     description:
       name: wakelock_plus
-      sha256: "7253bca0fcf40d8413ddfcf4d2a1fa0a82475e79be25a4f2c564b695c9351486"
+      sha256: "39a1d99085cf3190d41305bca05f0c0d77522f355f7f99bb648ee231192d9d68"
       url: "https://pub.dev"
     source: hosted
-    version: "1.7.0"
+    version: "1.8.2"
   wakelock_plus_platform_interface:
     dependency: transitive
     description:
       name: wakelock_plus_platform_interface
-      sha256: "0618d1799f0b28bcf98255b4ee8313e6fc4d38589dc4ee5fe5840d57d1aff6da"
+      sha256: "764c25504562abc8ac3406f5d175f126b276e6ba916c7c2675690b73368ca384"
       url: "https://pub.dev"
     source: hosted
-    version: "1.6.0"
+    version: "1.7.0"
   watcher:
     dependency: transitive
     description:
