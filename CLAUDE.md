@@ -38,7 +38,7 @@ The app has a permanent layered stack, NOT traditional screen navigation:
 2. **Active screens** (fade in on touch) — horizontal PageView with dark scrim over photos
 3. **Ambient overlays** (fade in when idle) — clock, weather, memory label
 4. **Edge-swipe zones + menu overlays** — invisible top/bottom strips; Menu 1 / Menu 2 slide in from their assigned edge
-5. **Full-screen overlays** (topmost, in this stacking order) — notification deck, alarm alert, DLNA cast, Plex cast, Live TV
+5. **Full-screen overlays** (topmost, in this stacking order) — notification deck, camera feed, alarm alert, DLNA cast, Plex cast, Live TV
 
 The active/ambient layers crossfade via a single `AnimationController`. The app starts idle (ambient visible) and wakes on touch.
 
