@@ -11,7 +11,6 @@ import 'package:mqtt_client/mqtt_server_client.dart';
 import '../app/current_screen_provider.dart';
 import '../app/screen_navigator.dart';
 import '../config/hub_config.dart';
-import '../models/hearth_notification.dart';
 import '../models/music_state.dart';
 import '../modules/alarm_clock/alarm_models.dart';
 import '../modules/alarm_clock/alarm_service.dart';
@@ -682,14 +681,17 @@ class MqttService extends ChangeNotifier {
 
   /// Normalize an inbound notification payload and surface it as a deck card.
   /// HA publishes JSON to `hearth/<clientId>/notify`. Shares the normalize path
-  /// (`HearthNotification.fromIngest`) with `POST /api/notify`.
+  /// (`NotificationService.ingestPayload`) with `POST /api/notify`.
   ///
   /// Payload schema (all optional except one of title/message):
   /// ```json
   /// {"title": "...", "message": "...", "priority": "alert"|"info",
   ///  "sticky": true|false, "source": "...", "source_label": "...",
-  ///  "muted": true|false}
+  ///  "muted": true|false, "image": "/api/camera_proxy/camera.x",
+  ///  "image_refresh": 3, "camera": "front_door", "tag": "front_door",
+  ///  "timeout": 180}
   /// ```
+  /// `{"tag": "...", "clear": true}` closes that card.
   ///
   /// Two HA delivery paths (both land here):
   ///
@@ -716,12 +718,11 @@ class MqttService extends ChangeNotifier {
   ///      "priority": "info", "sticky": false}
   /// ```
   void _handleNotify(String payload) {
-    final notification = HearthNotification.fromIngest(_decodeJson(payload));
-    if (notification == null) {
-      Log.w('MQTT', 'Notify payload has no title/message: $payload');
-      return;
+    final id =
+        _ref.read(notificationServiceProvider).ingestPayload(_decodeJson(payload));
+    if (id == null) {
+      Log.w('MQTT', 'Invalid notify payload: $payload');
     }
-    _ref.read(notificationServiceProvider).ingest(notification);
   }
 
   void _handleAlarmDelete(String payload) {

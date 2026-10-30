@@ -738,6 +738,24 @@ void main() {
         expect(notifications.notifications, isEmpty);
       });
 
+      test('POST /api/notify clear returns 200', () async {
+        await post('/api/notify',
+            body: jsonEncode({'title': 'Person', 'tag': 'door'}),
+            headers: authHeaders);
+        expect(notifications.notifications, hasLength(1));
+        final r = await post('/api/notify',
+            body: jsonEncode({'tag': 'door', 'clear': true}),
+            headers: authHeaders);
+        expect(r.statusCode, 200);
+        expect(notifications.notifications, isEmpty);
+      });
+
+      test('POST /api/notify clear with no tag returns 400', () async {
+        final r = await post('/api/notify',
+            body: jsonEncode({'clear': true}), headers: authHeaders);
+        expect(r.statusCode, 400);
+      });
+
       test('POST /api/notify returns 503 when no service is wired', () async {
         // Swap back to a server built without a NotificationService.
         await server.stop();

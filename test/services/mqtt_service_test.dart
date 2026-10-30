@@ -486,5 +486,14 @@ void main() {
       await service.handleCommand(topic('notify'), 'not json');
       expect(notifications.notifications, isEmpty);
     });
+
+    test('notify with clear closes the tagged card', () async {
+      await service.handleCommand(
+          topic('notify'), '{"title": "Person", "tag": "door"}');
+      expect(notifications.notifications, hasLength(1));
+      await service.handleCommand(
+          topic('notify'), '{"tag": "door", "clear": true}');
+      expect(notifications.notifications, isEmpty);
+    });
   });
 }

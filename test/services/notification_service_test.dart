@@ -12,17 +12,23 @@ void main() {
     bool sticky = true,
     bool muted = false,
     VoidCallback? onDismiss,
+    String? tag,
+    Duration? timeout,
+    String? title,
+    DateTime? timestamp,
   }) {
     return HearthNotification(
-      id: id,
+      id: tag != null ? HearthNotification.idForTag(tag) : id,
+      tag: tag,
+      timeout: timeout,
       source: source,
       sourceLabel: defaultSourceLabel(source),
       priority: priority,
-      title: 'Title $id',
+      title: title ?? 'Title $id',
       body: 'Body $id',
       sticky: sticky,
       muted: muted,
-      timestamp: DateTime(2026, 1, 1, 9, 30),
+      timestamp: timestamp ?? DateTime(2026, 1, 1, 9, 30),
       onDismiss: onDismiss,
     );
   }
@@ -146,6 +152,168 @@ void main() {
       // Wait past the lifetime — onDismiss must not fire a second time.
       await Future<void>.delayed(const Duration(milliseconds: 60));
       expect(called, 1);
+    });
+
+    group('tags', () {
+      const shortTimeout = Duration(milliseconds: 40);
+      Future<void> wait(int ms) =>
+          Future<void>.delayed(Duration(milliseconds: ms));
+
+      test('same tag updates in place with no second chime', () {
+        service.ingest(make(id: 'a'));
+        service.ingest(make(tag: 'door', title: 'First'));
+        service.ingest(make(id: 'b'));
+        service.ingest(make(tag: 'door', title: 'Second'));
+        expect(service.notifications.map((n) => n.id),
+            ['a', 'tag-door', 'b']);
+        expect(service.notifications[1].title, 'Second');
+        expect(chimed, hasLength(3));
+      });
+
+      test('same-tag update keeps the original timestamp', () {
+        final first = DateTime(2026, 1, 1, 9, 30);
+        service.ingest(make(tag: 'door', timestamp: first));
+        service.ingest(make(tag: 'door', timestamp: DateTime(2026, 1, 1, 9, 31)));
+        expect(service.notifications.single.timestamp, first);
+      });
+
+      test('same-tag update keeps the original onDismiss', () {
+        var called = 0;
+        service.ingest(make(tag: 'door', onDismiss: () => called++));
+        service.ingest(make(tag: 'door'));
+        service.dismiss('tag-door');
+        expect(called, 1);
+      });
+
+      test('timeout closes the card and restarts on update', () async {
+        service.ingest(make(tag: 'door', timeout: shortTimeout));
+        await wait(25);
+        service.ingest(make(tag: 'door', timeout: shortTimeout));
+        await wait(25);
+        expect(service.notifications, hasLength(1),
+            reason: 'the update should have restarted the timeout');
+        await wait(40);
+        expect(service.notifications, isEmpty);
+      });
+
+      test('timeout applies to an untagged card', () async {
+        service.ingest(make(id: 'a', timeout: shortTimeout));
+        await wait(70);
+        expect(service.notifications, isEmpty);
+      });
+
+      test('clear removes the card and is idempotent', () {
+        var called = 0;
+        service.ingest(make(tag: 'door', onDismiss: () => called++));
+        service.clear('door');
+        service.clear('door');
+        service.clear('never-seen');
+        expect(service.notifications, isEmpty);
+        expect(called, 1);
+      });
+
+      test('dismissed tag ignores updates without notifying', () {
+        service.ingest(make(tag: 'door', timeout: const Duration(seconds: 5)));
+        service.dismiss('tag-door');
+        var notifyCount = 0;
+        service.addListener(() => notifyCount++);
+
+        service.ingest(make(tag: 'door', timeout: const Duration(seconds: 5)));
+
+        expect(service.notifications, isEmpty);
+        expect(notifyCount, 0);
+        expect(chimed, hasLength(1));
+      });
+
+      test('clear forgets a dismissed tag', () {
+        service.ingest(make(tag: 'door', timeout: const Duration(seconds: 5)));
+        service.dismiss('tag-door');
+        service.clear('door');
+
+        service.ingest(make(tag: 'door', timeout: const Duration(seconds: 5)));
+
+        expect(service.notifications, hasLength(1));
+        expect(chimed, hasLength(2));
+      });
+
+      test('timeout forgets a dismissed tag', () async {
+        service.ingest(make(tag: 'door', timeout: shortTimeout));
+        service.dismiss('tag-door');
+        await wait(70);
+
+        service.ingest(make(tag: 'door', timeout: shortTimeout));
+
+        expect(service.notifications, hasLength(1));
+        expect(chimed, hasLength(2));
+      });
+
+      test('an update restarts the dismissed-tag timeout', () async {
+        service.ingest(make(tag: 'door', timeout: shortTimeout));
+        service.dismiss('tag-door');
+        await wait(25);
+        service.ingest(make(tag: 'door', timeout: shortTimeout));
+        await wait(25);
+
+        service.ingest(make(tag: 'door', timeout: shortTimeout));
+
+        expect(service.notifications, isEmpty,
+            reason: 'the heartbeats should have kept the tag remembered');
+      });
+
+      test('a tag with no timeout is not remembered after dismiss', () {
+        service.ingest(make(tag: 'door'));
+        service.dismiss('tag-door');
+
+        service.ingest(make(tag: 'door'));
+
+        expect(service.notifications, hasLength(1));
+        expect(chimed, hasLength(2));
+      });
+
+      test('a card closed by timeout is not remembered', () async {
+        service.ingest(make(tag: 'door', timeout: shortTimeout));
+        await wait(70);
+        expect(service.notifications, isEmpty);
+
+        service.ingest(make(tag: 'door', timeout: shortTimeout));
+
+        expect(service.notifications, hasLength(1));
+        expect(chimed, hasLength(2));
+      });
+    });
+
+    group('ingestPayload', () {
+      test('adds a card and returns its id', () {
+        final id = service.ingestPayload({'title': 'x', 'tag': 'door'});
+        expect(id, 'tag-door');
+        expect(service.notifications.single.title, 'x');
+      });
+
+      test('with clear and tag clears', () {
+        service.ingestPayload({'title': 'x', 'tag': 'door'});
+        final id = service.ingestPayload({'tag': 'door', 'clear': true});
+        expect(id, 'tag-door');
+        expect(service.notifications, isEmpty);
+      });
+
+      test('with clear and no tag returns null', () {
+        service.ingestPayload({'title': 'x', 'tag': 'door'});
+        expect(service.ingestPayload({'clear': true}), isNull);
+        expect(service.ingestPayload({'title': 'y', 'clear': true}), isNull);
+        expect(service.notifications.map((n) => n.title), ['x']);
+      });
+
+      test('a clear value other than true is ignored', () {
+        final id = service
+            .ingestPayload({'title': 'x', 'tag': 'door', 'clear': 'yes'});
+        expect(id, 'tag-door');
+        expect(service.notifications, hasLength(1));
+      });
+
+      test('with no title or message returns null', () {
+        expect(service.ingestPayload({'priority': 'alert'}), isNull);
+        expect(service.notifications, isEmpty);
+      });
     });
   });
 }

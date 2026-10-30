@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart' show LicenseRegistry;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/screen_navigator.dart';
-import '../models/hearth_notification.dart';
 import '../modules/alarm_clock/alarm_models.dart';
 import '../modules/alarm_clock/alarm_service.dart';
 import '../utils/logger.dart';
@@ -701,11 +700,14 @@ class LocalApiServer {
 
   /// `POST /api/notify` — the HTTP fallback for non-MQTT setups (driven from
   /// HA via `rest_command`). Same JSON schema and normalize path
-  /// (`HearthNotification.fromIngest`) as the MQTT `.../notify` topic.
+  /// (`NotificationService.ingestPayload`) as the MQTT `.../notify` topic.
   ///
   /// Body: {"title": "...", "message": "...", "priority": "alert"|"info",
   ///        "sticky": true|false, "source": "...", "source_label": "...",
-  ///        "muted": true|false} — one of title/message required.
+  ///        "muted": true|false, "image": "...", "image_refresh": 3,
+  ///        "camera": "...", "tag": "...", "timeout": 180} — one of
+  ///        title/message required. {"tag": "...", "clear": true} closes
+  ///        that card.
   Future<void> _handleNotify(HttpRequest request) async {
     final service = _notificationService;
     if (service == null) {
@@ -717,8 +719,8 @@ class LocalApiServer {
       return;
     }
     final json = await _readJsonBody(request);
-    final notification = HearthNotification.fromIngest(json);
-    if (notification == null) {
+    final id = service.ingestPayload(json);
+    if (id == null) {
       request.response.statusCode = 400;
       request.response.headers.contentType = ContentType.json;
       request.response
@@ -726,10 +728,9 @@ class LocalApiServer {
       await request.response.close();
       return;
     }
-    service.ingest(notification);
     request.response.statusCode = 200;
     request.response.headers.contentType = ContentType.json;
-    request.response.write(jsonEncode({'status': 'ok', 'id': notification.id}));
+    request.response.write(jsonEncode({'status': 'ok', 'id': id}));
     await request.response.close();
   }
 
