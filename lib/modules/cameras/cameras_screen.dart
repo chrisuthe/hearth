@@ -7,6 +7,7 @@ import '../../app/tokens/tokens.dart';
 import '../../services/toast_service.dart';
 import '../../services/video/hearth_video_player.dart';
 import '../../utils/logger.dart';
+import 'camera_feed_overlay.dart';
 import 'frigate_service.dart';
 import '../../app/theme/hearth_colors.dart';
 import '../../widgets/themed_background.dart';
@@ -151,6 +152,12 @@ class _CamerasScreenState extends ConsumerState<CamerasScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Only one RTSP decoder runs at a time, so a feed opened from a notification
+    // card takes over from an expanded camera.
+    ref.listen(cameraFeedProvider, (_, next) {
+      if (next != null && _expandedCamera != null) _collapseCamera();
+    });
+
     final frigate = ref.watch(frigateServiceProvider);
     final cameras = frigate.cameras;
 
