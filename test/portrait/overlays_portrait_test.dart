@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'package:hearth/modules/livetv/live_tv_overlay.dart';
 import 'package:hearth/services/dlna/dlna_cast_overlay.dart';
 import 'package:hearth/services/dlna/dlna_renderer_state.dart';
 import 'package:hearth/services/dlna/dlna_service.dart';
+import 'package:hearth/services/notification_image_loader.dart';
 import 'package:hearth/services/notification_service.dart';
 import 'package:hearth/services/plex/livetv/plex_livetv_service.dart';
 import 'package:hearth/services/plex/livetv/plex_livetv_state.dart';
@@ -24,6 +26,7 @@ import 'package:hearth/services/plex/plex_player_state.dart';
 import 'package:hearth/services/plex/plex_service.dart';
 import 'package:hearth/services/video/hearth_video_player.dart';
 import 'package:hearth/widgets/notification_deck_overlay.dart';
+import 'package:hearth/widgets/notification_picture.dart';
 
 import 'module_support.dart' show FakeHomeAssistant;
 import 'portrait_fixtures.dart';
@@ -38,6 +41,15 @@ class _RingingAlarmService extends AlarmService {
 
   @override
   Alarm? get firedAlarm => _fired;
+}
+
+/// A 4:3 frame, the shape many doorbells produce, with no network behind it.
+class _FixedPictureLoader extends NotificationImageLoader {
+  _FixedPictureLoader() : super(haUrl: '', haToken: '');
+
+  @override
+  Future<Uint8List?> fetch(String image) async => base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAIAAAA7ljmRAAAAEElEQVR4nGNwCEiAIwacHADaBwtBoHgf+wAAAABJRU5ErkJggg==');
 }
 
 /// A stream that never starts, so the feed stays on its placeholder.
@@ -95,6 +107,45 @@ void main() {
         overrides: [notificationServiceProvider.overrideWith((ref) => service)],
       );
       expect(find.byType(Dismissible), findsNWidgets(3));
+      await unmount(tester);
+    });
+
+    testLayoutsAndSplitHalves('a camera card above two text cards',
+        (tester, canvas) async {
+      final service = silentNotifications()
+        ..ingest(sampleCameraNotification())
+        ..ingest(sampleNotification(0))
+        ..ingest(sampleNotification(1));
+      await _pumpOverlay(
+        tester,
+        NotificationDeckOverlay(onWake: () {}),
+        overrides: [
+          notificationServiceProvider.overrideWith((ref) => service),
+          notificationImageLoaderProvider
+              .overrideWithValue(_FixedPictureLoader()),
+        ],
+      );
+      expect(find.byType(NotificationPicture), findsOneWidget);
+      expect(find.byType(Dismissible), findsNWidgets(3));
+      await unmount(tester);
+    });
+
+    testLayoutsAndSplitHalves('a camera card on its own stays on screen',
+        (tester, canvas) async {
+      final service = silentNotifications()..ingest(sampleCameraNotification());
+      await _pumpOverlay(
+        tester,
+        NotificationDeckOverlay(onWake: () {}),
+        overrides: [
+          notificationServiceProvider.overrideWith((ref) => service),
+          notificationImageLoaderProvider
+              .overrideWithValue(_FixedPictureLoader()),
+        ],
+      );
+      final picture = tester.getRect(find.byType(NotificationPicture));
+      final close = tester.getRect(find.byIcon(Icons.close));
+      expect(picture.top, greaterThanOrEqualTo(0));
+      expect(close.bottom, lessThanOrEqualTo(canvas.height));
       await unmount(tester);
     });
   });

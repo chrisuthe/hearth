@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -7,14 +8,15 @@ import '../app/tokens/notification_tokens.dart';
 import '../app/tokens/tokens.dart';
 import '../models/hearth_notification.dart';
 import '../services/notification_service.dart' show kTransientNotificationLifetime;
+import 'notification_picture.dart';
 
 /// The shared notification card ("The Notification Card" in the handoff).
 ///
 /// Renders the source chip, priority dot + label, timestamp, dismiss button,
 /// title + body, a chime equalizer (animated only during the ~1.5s window
 /// after arrival), a per-card mute toggle, a sticky/transient tag pill, and —
-/// for transient cards — a 6s countdown bar. The camera row is intentionally
-/// omitted (deferred follow-up).
+/// for transient cards — a 6s countdown bar. A notification with an `image`
+/// shows it above all of that.
 ///
 /// Dismissal (the ✕ button, swipe) is driven by [onDismiss]; the countdown bar
 /// is a visual indicator only — `NotificationService`'s Dart timer owns the
@@ -23,10 +25,14 @@ class NotificationCard extends StatefulWidget {
   final HearthNotification notification;
   final VoidCallback onDismiss;
 
+  /// Makes the card tappable, called with its latest picture if it has one.
+  final ValueChanged<Uint8List?>? onOpenFeed;
+
   const NotificationCard({
     super.key,
     required this.notification,
     required this.onDismiss,
+    this.onOpenFeed,
   });
 
   @override
@@ -40,6 +46,9 @@ class _NotificationCardState extends State<NotificationCard>
   Timer? _chimeTimer;
   bool _chiming = false;
   late bool _muted;
+
+  /// Handed to the feed when the card is tapped. Nothing here rebuilds from it.
+  Uint8List? _latestFrame;
 
   bool get _isAlert =>
       widget.notification.priority == NotificationPriority.alert;
@@ -123,6 +132,40 @@ class _NotificationCardState extends State<NotificationCard>
   }
 
   Widget _buildCard(HearthNotification n, Color accent) {
+    final onOpenFeed = widget.onOpenFeed;
+    final card = _buildSurface(n, accent);
+    if (onOpenFeed == null) return card;
+    return GestureDetector(
+      onTap: () => onOpenFeed(_latestFrame),
+      child: card,
+    );
+  }
+
+  Widget _buildSurface(HearthNotification n, Color accent) {
+    final image = n.image;
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(
+        HearthSpacing.x6,
+        HearthSpacing.x5,
+        HearthSpacing.x5,
+        HearthSpacing.x5,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _metaRow(n, accent),
+          const SizedBox(height: HearthSpacing.x3),
+          _content(n),
+          const SizedBox(height: HearthSpacing.x4),
+          _chimeRow(n),
+          if (!n.sticky) ...[
+            const SizedBox(height: HearthSpacing.x3),
+            const _CountdownBar(),
+          ],
+        ],
+      ),
+    );
     return ClipRRect(
       borderRadius: BorderRadius.circular(NotifRadii.card),
       child: BackdropFilter(
@@ -147,7 +190,23 @@ class _NotificationCardState extends State<NotificationCard>
           ),
           child: Stack(
             children: [
-              // Left accent rail.
+              if (image == null)
+                content
+              else
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    NotificationPicture(
+                      image: image,
+                      refresh: n.imageRefresh,
+                      showPlayIcon: widget.onOpenFeed != null,
+                      onFrame: (frame) => _latestFrame = frame,
+                    ),
+                    content,
+                  ],
+                ),
+              // Left accent rail, painted over the picture.
               Positioned(
                 left: 0,
                 top: 0,
@@ -160,29 +219,6 @@ class _NotificationCardState extends State<NotificationCard>
                       left: Radius.circular(NotifRadii.card),
                     ),
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  HearthSpacing.x6,
-                  HearthSpacing.x5,
-                  HearthSpacing.x5,
-                  HearthSpacing.x5,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _metaRow(n, accent),
-                    const SizedBox(height: HearthSpacing.x3),
-                    _content(n),
-                    const SizedBox(height: HearthSpacing.x4),
-                    _chimeRow(n),
-                    if (!n.sticky) ...[
-                      const SizedBox(height: HearthSpacing.x3),
-                      const _CountdownBar(),
-                    ],
-                  ],
                 ),
               ),
             ],
@@ -303,7 +339,11 @@ class _NotificationCardState extends State<NotificationCard>
         const Spacer(),
         _ghostButton(_muted ? 'Unmute' : 'Mute', _toggleMute),
         const SizedBox(width: HearthSpacing.x2),
-        _tagPill(n.sticky ? 'Sticky' : 'Auto · 6s'),
+        _tagPill(widget.onOpenFeed != null
+            ? 'Tap for live view'
+            : n.sticky
+                ? 'Sticky'
+                : 'Auto · 6s'),
       ],
     );
   }
