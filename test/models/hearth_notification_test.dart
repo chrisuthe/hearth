@@ -64,6 +64,21 @@ void main() {
       expect(n.id, startsWith('ext-'));
     });
 
+    test('non-finite and absurdly long durations count as absent', () {
+      for (final bad in <Object>[
+        'Infinity',
+        'NaN',
+        double.infinity,
+        double.nan,
+        1e300,
+      ]) {
+        final n = HearthNotification.fromIngest(
+            {'title': 'x', 'timeout': bad, 'image_refresh': bad})!;
+        expect(n.timeout, isNull, reason: 'timeout: $bad');
+        expect(n.imageRefresh, isNull, reason: 'image_refresh: $bad');
+      }
+    });
+
     test('numeric strings are accepted', () {
       final n = HearthNotification.fromIngest(
           {'title': 'x', 'image_refresh': '3', 'timeout': '45'})!;

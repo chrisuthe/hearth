@@ -51,14 +51,16 @@ String? _optionalString(Object? value) {
   return s.isEmpty ? null : s;
 }
 
-/// A positive number of seconds (a number or numeric string), or null.
+/// A sensible number of seconds (a number or numeric string), or null. Anything
+/// non-positive, non-finite or over a day counts as absent.
 Duration? _optionalSeconds(Object? value) {
   final seconds = value is num
       ? value
       : value is String
           ? num.tryParse(value.trim())
           : null;
-  if (seconds == null || seconds <= 0) return null;
+  if (seconds == null || !seconds.isFinite || seconds <= 0) return null;
+  if (seconds > Duration.secondsPerDay) return null;
   return Duration(milliseconds: (seconds * 1000).round());
 }
 
