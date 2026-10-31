@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/hub_config.dart';
 import '../models/hearth_notification.dart';
 import '../utils/logger.dart';
+import 'android_sounds.dart';
 import 'display_mode_service.dart';
 
 /// How long a transient (non-sticky) card lives before auto-dismissing.
@@ -21,7 +22,7 @@ const Duration kTransientNotificationLifetime = Duration(seconds: 6);
 ///
 /// Side effects are injected so unit tests exercise ingest/dismiss/expiry with
 /// no audio subprocess: [playChime] defaults to a GStreamer one-shot on Linux
-/// (a log on other platforms), and [isChimeSuppressed] defaults to never
+/// and the native player on Android (a log on other platforms), and [isChimeSuppressed] defaults to never
 /// suppressing (the provider wires it to night mode).
 class NotificationService extends ChangeNotifier {
   NotificationService({
@@ -183,10 +184,11 @@ class NotificationService extends ChangeNotifier {
   }
 
   /// One-shot arrival chime. Alert = an urgent triple beep; info = a single
-  /// soft ping. Generated with GStreamer's `audiotestsrc` (no bundled asset),
-  /// mirroring `TimerService`'s alarm tone. A log-only no-op off Linux.
+  /// soft ping. Generated with GStreamer's `audiotestsrc` on Linux and the
+  /// native player on Android (no bundled asset), mirroring `TimerService`'s
+  /// alarm tone. A log-only no-op elsewhere.
   static Future<void> _defaultPlayChime(HearthNotification n) async {
-    if (!Platform.isLinux) {
+    if (!Platform.isLinux && !playsSoundsOnAndroid) {
       debugPrint('[NotificationService] chime: ${n.chimeLabel} (${n.priority.name})');
       return;
     }
@@ -210,6 +212,10 @@ class NotificationService extends ChangeNotifier {
   /// length (each ~1024/44100 ≈ 23ms), matching `TimerService`'s approach.
   static Future<void> _tone(int freq,
       {required int buffers, required double volume}) async {
+    if (playsSoundsOnAndroid) {
+      return AndroidSounds.playTone(
+          freq, Duration(milliseconds: buffers * 1024 * 1000 ~/ 44100), volume);
+    }
     final process = await Process.start('gst-launch-1.0', [
       'audiotestsrc', 'wave=sine', 'freq=$freq', 'num-buffers=$buffers',
       '!', 'audioconvert',

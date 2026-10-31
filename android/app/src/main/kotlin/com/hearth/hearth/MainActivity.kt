@@ -19,6 +19,7 @@ class MainActivity : FlutterActivity() {
     private var capture: CaptureChannel? = null
     private var wifi: WifiChannel? = null
     private var apps: AppsChannel? = null
+    private var sounds: SoundsChannel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         live++
@@ -51,6 +52,7 @@ class MainActivity : FlutterActivity() {
         capture = CaptureChannel(this, messenger)
         wifi = WifiChannel(this, messenger)
         apps = AppsChannel(this, messenger)
+        sounds = SoundsChannel(this, messenger)
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -66,6 +68,8 @@ class MainActivity : FlutterActivity() {
         wifi = null
         apps?.dispose()
         apps = null
+        sounds?.dispose()
+        sounds = null
         // Dart owns the satellite and Sendspin; without it nothing could
         // configure, mute or stop them. A newer instance (a relaunch with
         // CLEAR_TASK) already owns them.

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/hearth_notification.dart';
 import '../utils/logger.dart';
+import 'android_sounds.dart';
 import 'notification_service.dart';
 import 'voice_satellite_bridge.dart';
 
@@ -333,10 +334,10 @@ class TimerService extends ChangeNotifier {
   /// Play a looping beep when a timer fires. Uses GStreamer's audiotestsrc
   /// to generate a sine tone (no asset bundle dependency) and routes through
   /// autoaudiosink, which picks pipewiresink/alsasink based on what's
-  /// available. Loops until [_stopAlarmSound] is called by dismissTimer
+  /// available, or the native player on Android. Loops until [_stopAlarmSound] is called by dismissTimer
   /// or dismissAllFired.
   void _playBeep() {
-    if (!Platform.isLinux) {
+    if (!Platform.isLinux && !playsSoundsOnAndroid) {
       Log.i('Timer', 'Would play alarm tone (non-Linux platform)');
       return;
     }
@@ -351,13 +352,18 @@ class TimerService extends ChangeNotifier {
     // a "beep ... beep ... beep" pattern at ~1.2 Hz.
     while (_alarmLooping) {
       try {
-        _alarmProcess = await Process.start('gst-launch-1.0', [
-          'audiotestsrc', 'wave=sine', 'freq=880', 'num-buffers=20',
-          '!', 'audioconvert',
-          '!', 'volume', 'volume=0.5',
-          '!', 'autoaudiosink',
-        ]);
-        await _alarmProcess!.exitCode;
+        if (playsSoundsOnAndroid) {
+          await AndroidSounds.playTone(
+              880, const Duration(milliseconds: 464), 0.5);
+        } else {
+          _alarmProcess = await Process.start('gst-launch-1.0', [
+            'audiotestsrc', 'wave=sine', 'freq=880', 'num-buffers=20',
+            '!', 'audioconvert',
+            '!', 'volume', 'volume=0.5',
+            '!', 'autoaudiosink',
+          ]);
+          await _alarmProcess!.exitCode;
+        }
         if (!_alarmLooping) break;
         await Future.delayed(const Duration(milliseconds: 400));
       } catch (e) {
