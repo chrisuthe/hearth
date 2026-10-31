@@ -7,6 +7,7 @@ import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import io.flutter.FlutterInjector
 import io.flutter.plugin.common.BinaryMessenger
@@ -108,10 +109,21 @@ class SoundsChannel(
             track.write(samples, 0, samples.size)
             track.setVolume(volume)
             track.play()
-            Thread.sleep(durationMs.toLong())
+            awaitEnd(track, samples.size, durationMs)
             track.stop()
         } finally {
             track.release()
+        }
+    }
+
+    /**
+     * Waits for the last frame to play. A fixed sleep would cut the fade-out by
+     * the track's start-up latency, and that cut is the click the fade prevents.
+     */
+    private fun awaitEnd(track: AudioTrack, frames: Int, durationMs: Int) {
+        val deadline = SystemClock.uptimeMillis() + durationMs + END_MARGIN_MS
+        while (track.playbackHeadPosition < frames && SystemClock.uptimeMillis() < deadline) {
+            Thread.sleep(END_POLL_MS)
         }
     }
 
@@ -163,8 +175,14 @@ class SoundsChannel(
         val key = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(asset)
         val file = File(context.cacheDir, "sounds/${File(asset).name}")
         file.parentFile?.mkdirs()
+        // Through a rename, since a relaunching instance may still be playing it.
+        val partial = File.createTempFile(file.name, null, file.parentFile)
         context.assets.open(key).use { input ->
-            file.outputStream().use { output -> input.copyTo(output) }
+            partial.outputStream().use { output -> input.copyTo(output) }
+        }
+        if (!partial.renameTo(file)) {
+            partial.delete()
+            throw java.io.IOException("Couldn't save ${file.name}")
         }
         return file
     }
@@ -172,5 +190,7 @@ class SoundsChannel(
     private companion object {
         const val TAG = "SoundsChannel"
         const val SAMPLE_RATE = 44100
+        const val END_POLL_MS = 5L
+        const val END_MARGIN_MS = 300L
     }
 }

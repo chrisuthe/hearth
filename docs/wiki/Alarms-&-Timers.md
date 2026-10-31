@@ -41,6 +41,10 @@ snoozed alarm rings again when the snooze time ends. If nobody responds, the sou
 rings within a few seconds of its time, and if Hearth was off and comes back more than a minute
 late, it waits for the alarm's next time.
 
+If another alarm comes due while one is ringing, it rings as soon as the first is snoozed or
+dismissed. If the first has already gone quiet after its 30 minutes, the new alarm takes over and
+the first counts as dismissed.
+
 > **Not wired up yet:** the **Sunrise effect** is saved with the alarm but doesn't run.
 
 ![The alarm editor with time, repeat days, sunrise, and sound](images/alarm-editor.png)

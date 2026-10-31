@@ -154,7 +154,7 @@ Future<void> main() async {
   }
 
   // Eager-load AlarmService so persisted alarms are loaded and the
-  // 30-second ticker starts checking fire times immediately.
+  // ticker starts checking fire times immediately.
   final alarmService = container.read(alarmServiceProvider);
   await alarmService.load();
 

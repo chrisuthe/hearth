@@ -44,10 +44,17 @@ class AlarmService extends ChangeNotifier {
 
   List<Alarm> _alarms = [];
   Alarm? _firedAlarm;
-  DateTime? _snoozedUntil;
-  String? _snoozedAlarmId;
   Timer? _ticker;
   Timer? _toneTimer;
+
+  /// Whether the alarm on screen has rung for its whole [_toneLimit].
+  bool _toneExpired = false;
+
+  /// When each snoozed alarm rings again.
+  final Map<String, DateTime> _snoozes = {};
+
+  /// Alarms that came due while another was on screen, oldest first.
+  final List<String> _waiting = [];
 
   /// How late a check may land and still ring the alarm. Past this, the moment
   /// has gone (the kiosk was off, say) and the alarm waits for its next time.
@@ -67,8 +74,14 @@ class AlarmService extends ChangeNotifier {
   /// The alarm currently firing (awaiting snooze/dismiss), or null.
   Alarm? get firedAlarm => _firedAlarm;
 
-  /// If snoozed, when the snooze expires. Null otherwise.
-  DateTime? get snoozedUntil => _snoozedUntil;
+  /// When the next snooze expires, or null if nothing is snoozed.
+  DateTime? get snoozedUntil {
+    DateTime? earliest;
+    for (final until in _snoozes.values) {
+      if (earliest == null || until.isBefore(earliest)) earliest = until;
+    }
+    return earliest;
+  }
 
   /// The next alarm to fire: returns (alarm, fireTime) for the soonest
   /// enabled alarm, or null if none are scheduled.
@@ -135,6 +148,11 @@ class AlarmService extends ChangeNotifier {
     if (idx >= 0) {
       _alarms[idx] = alarm;
       _skipIfJustPassed(alarm);
+      if (!alarm.enabled) {
+        _stopRinging(alarm.id);
+      } else if (_firedAlarm?.id == alarm.id) {
+        _updateRinging(alarm);
+      }
       _save();
       notifyListeners();
     }
@@ -146,7 +164,8 @@ class AlarmService extends ChangeNotifier {
     _handled.clear();
     _alarms.forEach(_skipIfJustPassed);
     _firedAlarm = null;
-    _clearSnooze();
+    _snoozes.clear();
+    _waiting.clear();
     _stopTone();
     await _save();
     if (_alarms.isEmpty) {
@@ -200,27 +219,34 @@ class AlarmService extends ChangeNotifier {
 
   void _onTick() {
     final now = _clock();
-    if (_firedAlarm != null) return; // Already firing, wait for user action.
 
-    final snoozedUntil = _snoozedUntil;
-    if (snoozedUntil != null && !now.isBefore(snoozedUntil)) {
-      final id = _snoozedAlarmId;
-      _clearSnooze();
-      final alarm = _alarms.where((a) => a.id == id && a.enabled).firstOrNull;
-      if (alarm != null) {
-        _fireAlarm(alarm);
-        return;
+    for (final entry in _snoozes.entries.toList()) {
+      if (!now.isBefore(entry.value)) {
+        _snoozes.remove(entry.key);
+        _enqueue(entry.key);
       }
     }
-
     for (final alarm in _alarms) {
       if (!alarm.enabled) continue;
       final occurrence = _dueOccurrence(alarm, now);
       if (occurrence == null || _handled[alarm.id] == occurrence) continue;
       _handled[alarm.id] = occurrence;
-      _fireAlarm(alarm);
-      return;
+      _enqueue(alarm.id);
     }
+
+    if (_waiting.isEmpty) return;
+    if (_firedAlarm != null) {
+      if (!_toneExpired) return; // Still ringing, the next one waits its turn.
+      // Nobody came. An alarm left on screen mustn't swallow the next one.
+      dismiss();
+    }
+    final id = _waiting.removeAt(0);
+    final alarm = _alarms.where((a) => a.id == id && a.enabled).firstOrNull;
+    if (alarm != null) _fireAlarm(alarm);
+  }
+
+  void _enqueue(String id) {
+    if (!_waiting.contains(id)) _waiting.add(id);
   }
 
   /// The time [alarm] was due within [_lateWindow] before [now], if any.
@@ -239,32 +265,45 @@ class AlarmService extends ChangeNotifier {
 
   void _fireAlarm(Alarm alarm) {
     _firedAlarm = alarm;
-    if (_snoozedAlarmId == alarm.id) _clearSnooze();
+    _snoozes.remove(alarm.id);
     _startTone(alarm);
     notifyListeners();
   }
 
   void _startTone(Alarm alarm) {
     _stopTone();
-    if (alarm.soundType == 'none') return;
-    _audio.play(alarm.soundId, volume: alarm.volume);
-    _toneTimer = Timer(_toneLimit, _stopTone);
+    if (alarm.soundType != 'none') {
+      _audio.play(alarm.soundId, volume: alarm.volume);
+    }
+    _toneTimer = Timer(_toneLimit, () {
+      _toneTimer = null;
+      _toneExpired = true;
+      _audio.stop();
+    });
   }
 
   void _stopTone() {
     _toneTimer?.cancel();
     _toneTimer = null;
+    _toneExpired = false;
     _audio.stop();
   }
 
-  void _clearSnooze() {
-    _snoozedUntil = null;
-    _snoozedAlarmId = null;
+  /// Keeps the ringing alarm current, restarting the tone only if it changed.
+  void _updateRinging(Alarm alarm) {
+    final previous = _firedAlarm!;
+    _firedAlarm = alarm;
+    if (alarm.soundType != previous.soundType ||
+        alarm.soundId != previous.soundId ||
+        alarm.volume != previous.volume) {
+      _startTone(alarm);
+    }
   }
 
-  /// Ends [id]'s ring and any snooze, when the alarm is deleted or turned off.
+  /// Ends everything [id] has in progress, when it's deleted or turned off.
   void _stopRinging(String id) {
-    if (_snoozedAlarmId == id) _clearSnooze();
+    _snoozes.remove(id);
+    _waiting.remove(id);
     if (_firedAlarm?.id == id) {
       _firedAlarm = null;
       _stopTone();
@@ -286,10 +325,9 @@ class AlarmService extends ChangeNotifier {
   /// Snooze the currently firing alarm.
   void snooze() {
     if (_firedAlarm == null) return;
-    _snoozedUntil = _clock().add(
+    _snoozes[_firedAlarm!.id] = _clock().add(
       Duration(minutes: _firedAlarm!.snoozeDuration),
     );
-    _snoozedAlarmId = _firedAlarm!.id;
     _firedAlarm = null;
     _stopTone();
     notifyListeners();

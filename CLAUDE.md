@@ -71,7 +71,7 @@ What `main.dart` actually sequences, in order:
 5. **Timezone** — applied before anything reads the clock (Linux only; no-op elsewhere)
 6. **LocalApiServer** — starts on port 8090; reads config per-request, so it never restarts on settings change
 7. **Eager reads** — Sendspin, voice ducker, DLNA, Plex, MQTT. These are self-initializing too, but need a read at boot to *start advertising* (mDNS / SSDP / GDM / MQTT discovery) rather than waiting for a widget to watch them
-8. **AlarmService** — awaited `load()` so persisted alarms and the 30s fire-check ticker are live immediately
+8. **AlarmService** — awaited `load()` so persisted alarms and the fire-check ticker are live immediately
 
 The dependency that does exist: **FrigateService** listens to HA events, and **DisplayModeService** can watch an HA entity for night mode. Music Assistant connects directly and does *not* depend on HA.
 
