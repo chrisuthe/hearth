@@ -34,6 +34,11 @@ class NotificationService extends ChangeNotifier {
 
   final List<HearthNotification> _notifications = [];
   final Map<String, Timer> _autoDismissTimers = {};
+
+  /// Tags the user dismissed while their automation may still be re-sending
+  /// them. Updates for these are ignored until a `clear` arrives or the tag's
+  /// `timeout` passes with no update.
+  final Map<String, Timer> _dismissedTags = {};
   final Future<void> Function(HearthNotification) _playChime;
   final bool Function() _isChimeSuppressed;
   final Duration _transientLifetime;
@@ -48,10 +53,26 @@ class NotificationService extends ChangeNotifier {
   /// Add a notification: append, play its chime (unless muted, suppressed by
   /// night mode, or timer-sourced — `TimerService` owns the looping fired-timer
   /// beep), and arm a 6s auto-dismiss for transient cards.
+  ///
+  /// A tagged card updates in place with no chime, and an update for a tag the
+  /// user dismissed is dropped without notifying, so it can't wake the screen.
   void ingest(HearthNotification notification) {
+    final tag = notification.tag;
+    if (tag != null && _dismissedTags.containsKey(tag)) {
+      _rememberDismissedTag(tag, notification.timeout);
+      return;
+    }
+
     // Replace any existing card with the same id (e.g. a timer re-ingested)
     // so a stable id can't stack duplicates.
     final existing = _notifications.indexWhere((n) => n.id == notification.id);
+    if (existing >= 0 && tag != null) {
+      _autoDismissTimers.remove(notification.id)?.cancel();
+      _notifications[existing] = notification.updating(_notifications[existing]);
+      notifyListeners();
+      _armAutoDismiss(notification);
+      return;
+    }
     if (existing >= 0) {
       _autoDismissTimers.remove(notification.id)?.cancel();
       _notifications.removeAt(existing);
@@ -67,21 +88,70 @@ class NotificationService extends ChangeNotifier {
       _playChime(notification);
     }
 
-    if (!notification.sticky) {
-      _autoDismissTimers[notification.id] =
-          Timer(_transientLifetime, () => dismiss(notification.id));
-    }
+    _armAutoDismiss(notification);
   }
 
-  /// Remove one notification by id. Idempotent — a no-op if it's already gone,
-  /// which keeps the timer-card ↔ `TimerService` dismissal loop from recursing.
+  /// Normalize an inbound MQTT or HTTP payload and act on it: `clear: true`
+  /// with a `tag` closes that card, anything else surfaces a card. Returns the
+  /// affected card's id, or null when the payload is invalid.
+  String? ingestPayload(Map<String, dynamic> json) {
+    if (json['clear'] == true) {
+      final tag = HearthNotification.tagFromPayload(json);
+      if (tag == null) return null;
+      clear(tag);
+      return HearthNotification.idForTag(tag);
+    }
+    final notification = HearthNotification.fromIngest(json);
+    if (notification == null) return null;
+    ingest(notification);
+    return notification.id;
+  }
+
+  /// Close the card for [tag] and forget any dismissal of it. Idempotent.
+  void clear(String tag) {
+    _dismissedTags.remove(tag)?.cancel();
+    _remove(HearthNotification.idForTag(tag));
+  }
+
+  /// Remove one notification by id, as the user dismissing it. Idempotent — a
+  /// no-op if it's already gone, which keeps the timer-card ↔ `TimerService`
+  /// dismissal loop from recursing.
+  ///
+  /// A tagged card with a `timeout` is remembered, so the automation's next
+  /// heartbeat can't bring it back. Without a `timeout` nothing would ever end
+  /// that memory, so the tag stays free to show again.
   void dismiss(String id) {
+    final index = _notifications.indexWhere((n) => n.id == id);
+    if (index < 0) return;
+    final card = _notifications[index];
+    final tag = card.tag;
+    if (tag != null && card.timeout != null) {
+      _rememberDismissedTag(tag, card.timeout);
+    }
+    _remove(id);
+  }
+
+  void _remove(String id) {
     final index = _notifications.indexWhere((n) => n.id == id);
     if (index < 0) return;
     final removed = _notifications.removeAt(index);
     _autoDismissTimers.remove(id)?.cancel();
     notifyListeners();
     removed.onDismiss?.call();
+  }
+
+  void _armAutoDismiss(HearthNotification notification) {
+    final lifetime = notification.timeout ??
+        (notification.sticky ? null : _transientLifetime);
+    if (lifetime == null) return;
+    _autoDismissTimers[notification.id] =
+        Timer(lifetime, () => _remove(notification.id));
+  }
+
+  void _rememberDismissedTag(String tag, Duration? timeout) {
+    _dismissedTags.remove(tag)?.cancel();
+    if (timeout == null) return;
+    _dismissedTags[tag] = Timer(timeout, () => _dismissedTags.remove(tag));
   }
 
   /// Remove every active notification and cancel all timers.
@@ -105,6 +175,10 @@ class NotificationService extends ChangeNotifier {
       timer.cancel();
     }
     _autoDismissTimers.clear();
+    for (final timer in _dismissedTags.values) {
+      timer.cancel();
+    }
+    _dismissedTags.clear();
     super.dispose();
   }
 

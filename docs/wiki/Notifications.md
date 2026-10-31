@@ -117,6 +117,97 @@ Every field is optional **except** that you must send at least one of `title` or
 | `source` | `frigate` \| `unifi` \| `ha` \| `push` \| `timer` — default `ha` | Drives the source chip. `protect` is accepted for `unifi`, and `home_assistant` for `ha`. An unknown value counts as `ha`. |
 | `source_label` | string | Overrides the chip text (default derived from `source`, e.g. `HOME ASST`). |
 | `muted` | `true` \| `false` — default `false` | Arrives with no chime. Rarely set — muting is normally a per-card toggle on the kiosk. |
+| `image` | path or URL | Picture for the card — see [Pictures and camera cards](#pictures-and-camera-cards). |
+| `image_refresh` | seconds | Re-fetch `image` at this interval. Omit it to fetch once. Values under 1 count as 1. |
+| `camera` | string | Frigate camera name. Tapping the card opens that camera's live feed. |
+| `tag` | string | Stable identity. Sending the same `tag` again updates the existing card instead of adding one. |
+| `clear` | `true` | With `tag`: closes that card. No title or message needed. |
+| `timeout` | seconds | Closes the card this long after its last update. Takes precedence over `sticky`. A card with `image_refresh` and no `timeout` gets 10 minutes. |
+
+## Pictures and camera cards
+
+Any notification can carry a picture from Home Assistant, which is how a camera
+alert shows who's at the door:
+
+```json
+{"tag": "front_door",
+ "title": "Person Detected at Front Door",
+ "image": "/api/camera_proxy/camera.front_door",
+ "image_refresh": 3,
+ "camera": "front_door",
+ "source": "frigate",
+ "timeout": 180}
+```
+
+**The picture.** A path starting with `/` is read from your Home Assistant, using
+the URL and token Hearth already has. So `/api/camera_proxy/<camera entity>` works
+for any camera in Home Assistant, whatever NVR is behind it. A full `http` or
+`https` URL also works. Hearth only sends your token to your Home Assistant's own
+address, so a picture hosted anywhere else must be readable without one. If a
+refresh fails, the last good picture stays up. If no picture ever loads, you get a
+normal text card.
+
+**The live feed.** `camera` is the name of a camera in **Frigate**, which must be
+set up in Hearth. Tapping the card fills the screen with its latest picture straight
+away, and live video takes over once it's playing. Tap again to return to what was
+showing. The feed also closes by itself after 5 minutes, or if the camera stops
+sending video. It keeps running if the card closes behind it.
+
+**One card per visit.** Re-send the same `tag` while the person is there and the
+card updates in place, with no second chime. Each message restarts `timeout`, so the
+card has no time limit while the messages keep coming, and it still closes if they
+stop. Send `{"tag": "...", "clear": true}` when the person has gone.
+
+If you dismiss a tagged card that has a `timeout`, Hearth ignores further updates for
+that tag until `clear` arrives or `timeout` passes with no update, so a repeat message
+can't bring it back. The next detection after that is a new card with a new chime.
+Each update replaces the whole card, so send every field each time.
+
+### Example automation
+
+Replace the sensor, camera and device ID with your own. Your person sensor's name
+depends on your camera integration.
+
+```yaml
+alias: Doorbell person → kitchen Hearth
+mode: queued
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.YOUR_PERSON_SENSOR
+    to: "on"
+    id: seen
+  - trigger: state
+    entity_id: binary_sensor.YOUR_PERSON_SENSOR
+    to: "off"
+    for: "00:00:30"
+    id: gone
+  - trigger: time_pattern
+    minutes: "/1"
+    id: heartbeat
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.id != 'heartbeat'
+         or is_state('binary_sensor.YOUR_PERSON_SENSOR', 'on') }}
+actions:
+  - action: mqtt.publish
+    data:
+      topic: "hearth/<device-id>/notify"
+      payload: >-
+        {% if trigger.id == 'gone' %}
+        {{ {"tag": "front_door", "clear": true} | to_json }}
+        {% else %}
+        {{ {"tag": "front_door",
+            "title": "Person Detected at Front Door",
+            "image": "/api/camera_proxy/camera.front_door",
+            "image_refresh": 3,
+            "camera": "front_door",
+            "source": "frigate",
+            "timeout": 180} | to_json }}
+        {% endif %}
+```
+
+The card closes about 30 seconds after the person leaves.
 
 ## On the kiosk
 

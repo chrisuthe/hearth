@@ -20,6 +20,7 @@ import '../widgets/notification_deck_overlay.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../modules/alarm_clock/alarm_alert_overlay.dart';
+import '../modules/cameras/camera_feed_overlay.dart';
 import '../modules/alarm_clock/alarm_service.dart';
 import '../modules/alarm_clock/sunrise_controller.dart';
 import '../modules/lists/lists_providers.dart';
@@ -546,6 +547,10 @@ class _HubShellState extends ConsumerState<HubShell> {
             // ConsumerWidget so 200ms timer ticks only rebuild this overlay,
             // not the entire HubShell. Renders nothing when the deck is empty.
             NotificationDeckOverlay(onWake: _onUserActivity),
+
+            // Camera feed — full-screen live view opened from a notification
+            // card. Renders nothing when closed.
+            CameraFeedOverlay(onWake: _onUserActivity),
 
             // Alarm alert — full-screen overlay when an alarm fires.
             AlarmAlertOverlay(onWake: _onUserActivity),

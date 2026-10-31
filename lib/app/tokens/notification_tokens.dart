@@ -38,6 +38,9 @@ class NotifColors {
   /// Info accent — calm steel blue, from oklch(0.72 0.09 232).
   static const Color info = Color(0xFF5F9BD1);
 
+  /// Behind a camera picture, which letterboxes rather than crops.
+  static const Color pictureBackdrop = Color(0xFF000000);
+
   /// Accent for a notification of the given priority.
   static Color accentFor(bool isAlert) => isAlert ? alert : info;
 }

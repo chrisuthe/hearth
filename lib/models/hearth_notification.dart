@@ -43,11 +43,33 @@ NotificationSource? _sourceFromString(Object? value) {
   return null;
 }
 
+/// A non-blank string, or null for anything else. The optional picture and tag
+/// fields tolerate a bad value rather than rejecting the whole notification.
+String? _optionalString(Object? value) {
+  if (value is! String) return null;
+  final s = value.trim();
+  return s.isEmpty ? null : s;
+}
+
+/// A sensible number of seconds (a number or numeric string), or null. Anything
+/// non-positive, non-finite or over a day counts as absent.
+Duration? _optionalSeconds(Object? value) {
+  final seconds = value is num
+      ? value
+      : value is String
+          ? num.tryParse(value.trim())
+          : null;
+  if (seconds == null || !seconds.isFinite || seconds <= 0) return null;
+  if (seconds > Duration.secondsPerDay) return null;
+  return Duration(milliseconds: (seconds * 1000).round());
+}
+
+/// How long a card with a refreshing picture lives without a `timeout`, so a
+/// lost close message can't leave it polling forever.
+const Duration kDefaultRefreshingCardTimeout = Duration(minutes: 10);
+
 /// A single notification, normalized across every source (Frigate, Unifi, HA,
 /// generic push, and fired timers) into one shape.
-///
-/// Camera fields (snapshot / live view) are intentionally absent — the camera
-/// row is a deferred follow-up, so nothing in this model references a stream.
 @immutable
 class HearthNotification {
   final String id;
@@ -74,6 +96,22 @@ class HearthNotification {
   /// `TimerService.dismissTimer` so dismissing the card stops the timer.
   final VoidCallback? onDismiss;
 
+  /// Picture for the card: an HA-relative path or an http(s) URL. See
+  /// `NotificationImageLoader` for how it resolves.
+  final String? image;
+
+  /// Re-fetch [image] at this interval. Null means fetch once.
+  final Duration? imageRefresh;
+
+  /// Frigate camera name. Makes the card tappable, opening that camera's feed.
+  final String? camera;
+
+  /// Stable identity: ingesting the same tag again updates the existing card.
+  final String? tag;
+
+  /// Close the card this long after its last update.
+  final Duration? timeout;
+
   const HearthNotification({
     required this.id,
     required this.source,
@@ -85,11 +123,45 @@ class HearthNotification {
     required this.timestamp,
     this.muted = false,
     this.onDismiss,
+    this.image,
+    this.imageRefresh,
+    this.camera,
+    this.tag,
+    this.timeout,
   });
+
+  /// The card id for a [tag]. A stable id is what makes an update land on the
+  /// existing card.
+  static String idForTag(String tag) => 'tag-$tag';
+
+  /// The valid `tag` in an ingest payload, if any.
+  static String? tagFromPayload(Map<String, dynamic> json) =>
+      _optionalString(json['tag']);
 
   /// The chime name shown next to the equalizer, derived from [priority].
   String get chimeLabel =>
       priority == NotificationPriority.alert ? 'Ember Alert' : 'Soft Ping';
+
+  /// This notification with [timestamp] and [onDismiss] taken from [previous],
+  /// the card it is updating.
+  HearthNotification updating(HearthNotification previous) =>
+      HearthNotification(
+        id: id,
+        source: source,
+        sourceLabel: sourceLabel,
+        priority: priority,
+        title: title,
+        body: body,
+        sticky: sticky,
+        timestamp: previous.timestamp,
+        muted: muted,
+        onDismiss: onDismiss ?? previous.onDismiss,
+        image: image,
+        imageRefresh: imageRefresh,
+        camera: camera,
+        tag: tag,
+        timeout: timeout,
+      );
 
   /// Normalize an inbound ingest payload (shared by the MQTT `.../notify`
   /// topic and `POST /api/notify`) into a notification.
@@ -97,8 +169,11 @@ class HearthNotification {
   /// Recognized keys: `title`, `message` (aka `body`), `priority`
   /// (`alert`|`info`, default `info`), `sticky` (default: sticky for alerts,
   /// transient for info), `source` (default [fallbackSource]), `source_label`,
-  /// and `muted`. Returns null when neither a title nor a body is present so
-  /// the caller can reject an empty notification.
+  /// `muted`, `image`, `image_refresh`, `camera`, `tag` and `timeout`. A
+  /// `timeout` takes precedence over `sticky`, and a refreshing picture with no
+  /// `timeout` gets [kDefaultRefreshingCardTimeout]. Returns null when neither
+  /// a title nor a body is present so the caller can reject an empty
+  /// notification.
   static HearthNotification? fromIngest(
     Map<String, dynamic> json, {
     NotificationSource fallbackSource = NotificationSource.ha,
@@ -113,9 +188,17 @@ class HearthNotification {
     final source = _sourceFromString(json['source']) ?? fallbackSource;
     final label = (json['source_label'] as String?)?.trim();
     final ts = now ?? DateTime.now();
+    final tag = tagFromPayload(json);
+    final requestedRefresh = _optionalSeconds(json['image_refresh']);
+    final imageRefresh = requestedRefresh == null ||
+            requestedRefresh >= const Duration(seconds: 1)
+        ? requestedRefresh
+        : const Duration(seconds: 1);
+    final timeout = _optionalSeconds(json['timeout']) ??
+        (imageRefresh != null ? kDefaultRefreshingCardTimeout : null);
 
     return HearthNotification(
-      id: 'ext-${ts.microsecondsSinceEpoch}',
+      id: tag != null ? idForTag(tag) : 'ext-${ts.microsecondsSinceEpoch}',
       source: source,
       sourceLabel: (label != null && label.isNotEmpty)
           ? label
@@ -123,9 +206,15 @@ class HearthNotification {
       priority: priority,
       title: title.isEmpty ? body : title,
       body: title.isEmpty ? '' : body,
-      sticky: json['sticky'] as bool? ?? priority == NotificationPriority.alert,
+      sticky: timeout != null ||
+          (json['sticky'] as bool? ?? priority == NotificationPriority.alert),
       muted: json['muted'] as bool? ?? false,
       timestamp: ts,
+      image: _optionalString(json['image']),
+      imageRefresh: imageRefresh,
+      camera: _optionalString(json['camera']),
+      tag: tag,
+      timeout: timeout,
     );
   }
 }

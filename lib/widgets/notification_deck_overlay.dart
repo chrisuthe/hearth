@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/tokens/notification_tokens.dart';
 import '../app/tokens/tokens.dart';
+import '../modules/cameras/camera_feed_overlay.dart';
 import '../services/notification_service.dart';
 import 'notification_card.dart';
+
+const double _kMinWidthToNarrowCards = 1000;
 
 /// The "Hearthstones" bottom-deck surface (handoff Direction 1B).
 ///
@@ -30,6 +33,12 @@ class NotificationDeckOverlay extends ConsumerWidget {
     // Wake from idle when a notification is present — deferred to avoid
     // notifyListeners() during build.
     WidgetsBinding.instance.addPostFrameCallback((_) => onWake());
+
+    final canvas = MediaQuery.sizeOf(context);
+    // A tall picture card would span a whole landscape panel, so it stays
+    // centred and narrower. Half of a split screen has no width to spare.
+    final narrowPictureCards =
+        canvas.width > canvas.height && canvas.width >= _kMinWidthToNarrowCards;
 
     return Padding(
       padding: const EdgeInsets.all(HearthSpacing.x6),
@@ -59,9 +68,19 @@ class NotificationDeckOverlay extends ConsumerWidget {
                       // affordance regardless.
                       direction: DismissDirection.up,
                       onDismissed: (_) => service.dismiss(n.id),
-                      child: NotificationCard(
-                        notification: n,
-                        onDismiss: () => service.dismiss(n.id),
+                      child: _sized(
+                        NotificationCard(
+                          notification: n,
+                          onDismiss: () => service.dismiss(n.id),
+                          onOpenFeed: n.camera == null
+                              ? null
+                              : (frame) => ref
+                                  .read(cameraFeedProvider.notifier)
+                                  .open(n.camera!, frame: frame),
+                        ),
+                        width: n.image != null && narrowPictureCards
+                            ? canvas.width * 0.56
+                            : null,
                       ),
                     ),
                   ),
@@ -72,6 +91,10 @@ class NotificationDeckOverlay extends ConsumerWidget {
       ),
     );
   }
+
+  static Widget _sized(Widget card, {double? width}) => width == null
+      ? card
+      : Center(child: SizedBox(width: width, child: card));
 }
 
 /// Plays the `riseUp` entrance once when a card mounts: translateY + scale,

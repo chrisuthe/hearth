@@ -8,6 +8,7 @@ import '../../models/protect_camera.dart';
 import '../../services/toast_service.dart';
 import '../../services/video/hearth_video_player.dart';
 import '../../utils/logger.dart';
+import '../cameras/camera_feed_overlay.dart';
 import '../cameras/cameras_screen.dart' show cameraGridColumns;
 import 'protect_service.dart';
 import '../../app/theme/hearth_colors.dart';
@@ -95,6 +96,12 @@ class _ProtectScreenState extends ConsumerState<ProtectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Only one RTSP decoder runs at a time, so a feed opened from a notification
+    // card takes over from an expanded camera.
+    ref.listen(cameraFeedProvider, (_, next) {
+      if (next != null && _expandedCamera != null) _collapseCamera();
+    });
+
     final cameras = ref.watch(protectServiceProvider).cameras;
 
     // --- Empty state ---

@@ -86,6 +86,21 @@ HearthNotification sampleNotification(
       timestamp: DateTime(2026, 4, 24, 21, 5),
     );
 
+HearthNotification sampleCameraNotification() => HearthNotification(
+      id: 'tag-door',
+      tag: 'door',
+      source: NotificationSource.frigate,
+      sourceLabel: 'FRIGATE',
+      priority: NotificationPriority.info,
+      title: 'Person Detected at Back Yard North Fence Overview',
+      body: '',
+      sticky: true,
+      timestamp: DateTime(2026, 4, 24, 21, 5),
+      image: '/api/camera_proxy/camera.back_yard_north_fence',
+      imageRefresh: const Duration(seconds: 3),
+      camera: 'back_yard_north_fence',
+    );
+
 /// Unmounts the tree so periodic timers and tickers owned by widgets and
 /// providers are cancelled before the test ends.
 Future<void> unmount(WidgetTester tester) async {
