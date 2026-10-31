@@ -78,7 +78,7 @@ See **[[Updating]]** for automatic checks and the update source.
 - [[Voice Satellite]] — the tablet itself becomes a Home Assistant voice satellite
 - [[Multi-Room Audio (Sendspin)]] — leave the Server URL blank on Android
 - [[Home Assistant Device (MQTT)]] — everything except the Volume entity
-- [[Notifications]] — cards show; the chime is silent
+- [[Notifications]] — cards and chimes, on the media volume
 - [[The Web Portal]], [[screen orientation|Display & Night Mode]] (applies straight away),
   screenshots and screen recording, and self-update
 
@@ -90,10 +90,6 @@ See **[[Updating]]** for automatic checks and the update source.
 
 **Doesn't work yet**
 
-- **Timer sounds.** A finished timer still shows its card, and rings through the voice
-  satellite when the satellite is on. (Alarm sounds aren't wired up on any platform yet — see
-  [[Alarms & Timers]].)
-- **Notification chimes.**
 - **WiFi management** from Hearth — use Android's WiFi settings.
 - **Timezone** — Hearth follows the tablet's timezone; set it in Android's settings.
 - **Volume over MQTT**, and the portal's logs page (`/logs`).

@@ -238,13 +238,14 @@ When a notification arrives:
   is correct (a wrong key returns `401`). Confirm your payload has a `title` or
   `message`.
 - **Card appears but no sound** — the kiosk is likely in **night mode** (chimes
-  are suppressed), the payload set `muted: true`, or it's an Android tablet
-  (below).
+  are suppressed), or the payload set `muted: true`. On an Android tablet, also
+  check the media volume.
 
 ## On Android
 
-Cards arrive and behave the same on an [[Android Tablet]], over MQTT or HTTP,
-but the **chime doesn't play yet**. Use the tablet's IP address for HTTP —
+Cards and chimes behave the same on an [[Android Tablet]], over MQTT or HTTP. The
+chime plays on the tablet's media volume, over any music rather than pausing it.
+Use the tablet's IP address for HTTP —
 `hearth.local` doesn't reach a tablet.
 
 See [[Troubleshooting & FAQ]] for more.
