@@ -38,7 +38,7 @@ void main() {
       expect(alarm.enabled, true);
       expect(alarm.days, isEmpty);
       expect(alarm.oneTime, false);
-      expect(alarm.sunriseDuration, 15);
+      expect(alarm.sunriseDuration, 0);
       expect(alarm.sunriseLights, isEmpty);
       expect(alarm.soundType, 'builtin');
       expect(alarm.soundId, 'gentle_morning');

@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hearth/config/hub_config.dart';
 import 'package:hearth/modules/alarm_clock/alarm_models.dart';
+import 'package:hearth/models/ha_entity.dart';
 import 'package:hearth/modules/alarm_clock/alarm_service.dart';
+import 'package:hearth/services/home_assistant_service.dart';
 import 'package:hearth/plugins/alarm_clock/alarm_clock_plugin.dart';
 import 'package:hearth/services/display_mode_service.dart';
 import 'package:hearth/services/local_api_server.dart';
@@ -14,6 +16,17 @@ import 'package:hearth/services/local_api_server.dart';
 /// [LocalApiServer]: the browser-facing add / edit / delete path that backs the
 /// web portal. Alarms live in [AlarmService] (not HubConfig), so the web-parity
 /// drift-guard doesn't cover them — these tests do.
+/// Offers fixed entities, with no Home Assistant behind them.
+class FakeHomeAssistant extends HomeAssistantService {
+  FakeHomeAssistant(List<HaEntity> entities)
+      : _fixed = {for (final e in entities) e.entityId: e};
+
+  final Map<String, HaEntity> _fixed;
+
+  @override
+  Map<String, HaEntity> get entities => _fixed;
+}
+
 void main() {
   group('Alarm Clock plugin routes', () {
     late ProviderContainer container;
@@ -94,6 +107,50 @@ void main() {
       expect(tones, isNotEmpty);
       expect(tones.first, containsPair('id', isA<String>()));
       expect(tones.first, containsPair('name', isA<String>()));
+    });
+
+    test('GET offers dimmable lights, by name, for the sunrise', () async {
+      HaEntity light(String id, String name, List<String> modes) => HaEntity(
+            entityId: id,
+            state: 'off',
+            attributes: {'friendly_name': name, 'supported_color_modes': modes},
+            lastChanged: DateTime(2026),
+          );
+      await server.stop();
+      container.dispose();
+      container = ProviderContainer(overrides: [
+        alarmServiceProvider.overrideWith((ref) => alarmService),
+        homeAssistantServiceProvider.overrideWith((ref) => FakeHomeAssistant([
+              light('light.zed', 'Zed Lamp', ['brightness']),
+              light('light.bed', 'Bedside', ['color_temp', 'rgb']),
+              light('light.switch', 'Lamp Switch', ['onoff']),
+            ])),
+      ]);
+      server = LocalApiServer(
+        displayModeService: displayService,
+        configNotifier: configNotifier,
+        readProvider: container.read,
+        plugins: [AlarmClockPlugin()],
+      );
+      port = await server.start(port: 0);
+
+      final r = await get('/api/plugin/hearth.alarm_clock/alarms');
+      final json = await readJson(r);
+
+      expect(json['lights'], [
+        {'id': 'light.bed', 'name': 'Bedside'},
+        {'id': 'light.zed', 'name': 'Zed Lamp'},
+      ]);
+    });
+
+    test('POST alarms/save keeps the picked sunrise lights', () async {
+      await post('/api/plugin/hearth.alarm_clock/alarms/save',
+          body: jsonEncode({
+            'time': '06:15',
+            'sunriseDuration': 10,
+            'sunriseLights': ['light.bed'],
+          }));
+      expect(alarmService.alarms.single.sunriseLights, ['light.bed']);
     });
 
     test('POST alarms/save with no id adds a new alarm', () async {

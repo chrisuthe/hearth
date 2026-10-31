@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../utils/logger.dart';
 import 'alarm_audio.dart';
 import 'alarm_models.dart';
+import 'sunrise_controller.dart';
 
 // dart:io and path_provider compile to stubs on web — guarded by kIsWeb at runtime.
 import 'dart:io' if (dart.library.html) 'dart:io';
@@ -20,6 +21,8 @@ const Duration kAlarmToneLimit = Duration(minutes: 30);
 /// persisted to `alarms.json` in the app support directory. A short periodic
 /// ticker checks whether any enabled alarm is due, and the chosen tone rings
 /// from when an alarm fires until it's snoozed, dismissed or hits [_toneLimit].
+/// It also points the [SunriseController] at the alarm due next, so every way
+/// of changing an alarm, MQTT and the API included, moves the sunrise with it.
 class AlarmService extends ChangeNotifier {
   /// Where `alarms.json` lives. Defaults to the app support directory;
   /// injectable so tests can point it at a temp directory.
@@ -28,22 +31,26 @@ class AlarmService extends ChangeNotifier {
   final DateTime Function() _clock;
   final AlarmAudioPlayer _audio;
   final Duration _toneLimit;
+  final SunriseController? _sunrise;
 
   AlarmService({
     Future<String> Function()? directory,
     DateTime Function()? clock,
     AlarmAudioPlayer? audio,
     Duration toneLimit = kAlarmToneLimit,
+    SunriseController? sunrise,
   })  : _directory = directory ?? _supportDirectory,
         _clock = clock ?? DateTime.now,
         _audio = audio ?? AlarmAudioPlayer(),
-        _toneLimit = toneLimit;
+        _toneLimit = toneLimit,
+        _sunrise = sunrise;
 
   static Future<String> _supportDirectory() async =>
       (await getApplicationSupportDirectory()).path;
 
   List<Alarm> _alarms = [];
   Alarm? _firedAlarm;
+  DateTime? _firedAt;
   Timer? _ticker;
   Timer? _toneTimer;
 
@@ -218,6 +225,11 @@ class AlarmService extends ChangeNotifier {
   }
 
   void _onTick() {
+    _ringDueAlarms();
+    _syncSunrise();
+  }
+
+  void _ringDueAlarms() {
     final now = _clock();
 
     for (final entry in _snoozes.entries.toList()) {
@@ -265,6 +277,7 @@ class AlarmService extends ChangeNotifier {
 
   void _fireAlarm(Alarm alarm) {
     _firedAlarm = alarm;
+    _firedAt = _clock();
     _snoozes.remove(alarm.id);
     _startTone(alarm);
     notifyListeners();
@@ -309,6 +322,66 @@ class AlarmService extends ChangeNotifier {
       _stopTone();
     }
   }
+
+  /// Every change comes through here, so none can leave the sunrise behind.
+  @override
+  void notifyListeners() {
+    _syncSunrise();
+    super.notifyListeners();
+  }
+
+  /// Points the sunrise at the alarm it should be running for, or ends it.
+  ///
+  /// A ringing alarm holds its sunrise at full. Otherwise it follows whichever
+  /// alarm rings next and is inside its window: the sunrise's minutes before
+  /// the alarm's time, or the whole of a snooze.
+  void _syncSunrise() {
+    final sunrise = _sunrise;
+    if (sunrise == null) return;
+
+    final fired = _firedAlarm;
+    if (fired != null && fired.sunriseDuration > 0) {
+      sunrise.run(
+        alarmId: fired.id,
+        start: _firedAt!.subtract(Duration(minutes: fired.sunriseDuration)),
+        end: _firedAt!,
+        lights: fired.sunriseLights,
+      );
+      return;
+    }
+
+    final now = _clock();
+    Alarm? next;
+    DateTime? nextRings;
+    for (final alarm in _alarms) {
+      if (!alarm.enabled || alarm.sunriseDuration <= 0) continue;
+      final rings = _snoozes[alarm.id] ?? alarm.nextFireTime(now);
+      if (rings == null || now.isBefore(rings.subtract(_sunriseLead(alarm)))) {
+        continue;
+      }
+      if (nextRings == null || rings.isBefore(nextRings)) {
+        next = alarm;
+        nextRings = rings;
+      }
+    }
+    if (next == null) {
+      sunrise.stop();
+      return;
+    }
+    sunrise.run(
+      alarmId: next.id,
+      start: nextRings!.subtract(_sunriseLead(next)),
+      end: nextRings,
+      from: _snoozes.containsKey(next.id) ? kSunriseSnoozeLevel : 0.0,
+      lights: next.sunriseLights,
+    );
+  }
+
+  Duration _sunriseLead(Alarm alarm) => Duration(
+        minutes: _snoozes.containsKey(alarm.id)
+            ? alarm.snoozeDuration
+            : alarm.sunriseDuration,
+      );
 
   /// Test-only: simulate an alarm firing without waiting for the ticker.
   @visibleForTesting
@@ -365,5 +438,7 @@ class AlarmService extends ChangeNotifier {
 }
 
 final alarmServiceProvider = ChangeNotifierProvider<AlarmService>((ref) {
-  return AlarmService();
+  // read, not watch: the controller is stable, and watching it would rebuild
+  // this service on every sunrise tick.
+  return AlarmService(sunrise: ref.read(sunriseControllerProvider));
 });

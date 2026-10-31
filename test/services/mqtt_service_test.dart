@@ -8,6 +8,7 @@ import 'package:hearth/config/hub_config.dart';
 import 'package:hearth/models/hearth_notification.dart';
 import 'package:hearth/modules/alarm_clock/alarm_models.dart';
 import 'package:hearth/modules/alarm_clock/alarm_service.dart';
+import 'package:hearth/modules/alarm_clock/sunrise_controller.dart';
 import 'package:hearth/services/mqtt_service.dart';
 import 'package:hearth/services/notification_service.dart';
 import 'package:hearth/services/timer_service.dart';
@@ -434,6 +435,51 @@ void main() {
       expect(alarms.firedAlarm, isNotNull);
       service.handleCommand(topic('alarm/dismiss'), '');
       expect(alarms.firedAlarm, isNull);
+    });
+
+    test('alarm/snooze sends the sunrise back to climb again', () {
+      const alarm = Alarm(id: 'a3', time: '06:00', sunriseDuration: 15);
+      alarms.addAlarm(alarm);
+      alarms.fireAlarmForTest(alarm);
+      final sunrise = container.read(sunriseControllerProvider);
+      expect(sunrise.progress, 1);
+
+      service.handleCommand(topic('alarm/snooze'), '');
+
+      expect(sunrise.active, isTrue);
+      expect(sunrise.progress, closeTo(kSunriseSnoozeLevel, 0.01));
+    });
+
+    test('alarm/dismiss ends the sunrise', () {
+      const alarm = Alarm(id: 'a4', time: '06:00', sunriseDuration: 15);
+      alarms.addAlarm(alarm);
+      alarms.fireAlarmForTest(alarm);
+      final sunrise = container.read(sunriseControllerProvider);
+      expect(sunrise.active, isTrue);
+
+      service.handleCommand(topic('alarm/dismiss'), '');
+
+      expect(sunrise.active, isFalse);
+    });
+
+    test('alarm/delete ends a sunrise in progress', () {
+      const alarm = Alarm(id: 'a5', time: '06:00', sunriseDuration: 15);
+      alarms.addAlarm(alarm);
+      alarms.fireAlarmForTest(alarm);
+      final sunrise = container.read(sunriseControllerProvider);
+      expect(sunrise.active, isTrue);
+
+      service.handleCommand(topic('alarm/delete'), '{"alarm_id": "a5"}');
+
+      expect(sunrise.active, isFalse);
+    });
+
+    test('alarm/create leaves the sunrise off unless asked', () {
+      service.handleCommand(topic('alarm/create'), '{"time": "07:30"}');
+      service.handleCommand(
+          topic('alarm/create'), '{"time": "08:30", "sunrise_duration": 20}');
+      expect(alarms.alarms.first.sunriseDuration, 0);
+      expect(alarms.alarms.last.sunriseDuration, 20);
     });
 
     test('an unknown command topic is a no-op', () {

@@ -27,18 +27,14 @@ class AlarmAlertOverlay extends ConsumerWidget {
     WidgetsBinding.instance.addPostFrameCallback((_) => onWake());
 
     final sunriseController = ref.watch(sunriseControllerProvider);
-    final bgColor = sunriseController.active
-        ? sunriseController.currentColor
-        : Colors.black;
+    final sunriseActive = sunriseController.active;
+    final bgColor = sunriseActive ? sunriseController.currentColor : Colors.black;
+    // The sunrise ends on a pale gold that white text can't be read against.
+    final ink = sunriseActive ? SunriseController.inkOn(bgColor) : Colors.white;
 
     return GestureDetector(
       // Tap anywhere to snooze
-      onTap: () {
-        alarmService.snooze();
-        if (sunriseController.active) {
-          sunriseController.snooze(firedAlarm.snoozeDuration);
-        }
-      },
+      onTap: alarmService.snooze,
       child: Container(
         color: bgColor.withValues(alpha: 0.95),
         child: Stack(
@@ -49,11 +45,12 @@ class AlarmAlertOverlay extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Current time (large)
-                  _CurrentTimeDisplay(),
+                  _CurrentTimeDisplay(color: ink),
                   const SizedBox(height: HearthSpacing.x4),
                   // Alarm icon
-                  const Icon(Icons.alarm,
-                      size: HearthIcon.xl, color: Color(0xFF646CFF)),
+                  Icon(Icons.alarm,
+                      size: HearthIcon.xl,
+                      color: sunriseActive ? ink : const Color(0xFF646CFF)),
                   const SizedBox(height: HearthSpacing.x3),
                   // Alarm label
                   if (firedAlarm.label.isNotEmpty)
@@ -65,10 +62,10 @@ class AlarmAlertOverlay extends ConsumerWidget {
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: HearthFont.headline,
                           fontWeight: FontWeight.w300,
-                          color: Colors.white70,
+                          color: ink.withValues(alpha: 0.7),
                         ),
                       ),
                     ),
@@ -88,23 +85,18 @@ class AlarmAlertOverlay extends ConsumerWidget {
                     height: HearthSpacing.x16,
                     width: 200,
                     child: Material(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      color: ink.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(30),
                       child: InkWell(
-                        onTap: () {
-                          alarmService.dismiss();
-                          if (sunriseController.active) {
-                            sunriseController.dismiss();
-                          }
-                        },
+                        onTap: alarmService.dismiss,
                         borderRadius: BorderRadius.circular(30),
-                        child: const Center(
+                        child: Center(
                           child: Text(
                             'Dismiss',
                             style: TextStyle(
                               fontSize: HearthFont.bodyLg,
                               fontWeight: FontWeight.w500,
-                              color: Colors.white,
+                              color: ink,
                             ),
                           ),
                         ),
@@ -117,7 +109,7 @@ class AlarmAlertOverlay extends ConsumerWidget {
                     'Tap anywhere to snooze',
                     style: TextStyle(
                       fontSize: HearthFont.label,
-                      color: Colors.white.withValues(alpha: 0.4),
+                      color: ink.withValues(alpha: sunriseActive ? 0.7 : 0.4),
                     ),
                   ),
                 ],
@@ -135,6 +127,10 @@ class AlarmAlertOverlay extends ConsumerWidget {
 /// Isolated in its own widget so 1-second ticks only rebuild this text,
 /// not the entire overlay.
 class _CurrentTimeDisplay extends StatefulWidget {
+  final Color color;
+
+  const _CurrentTimeDisplay({required this.color});
+
   @override
   State<_CurrentTimeDisplay> createState() => _CurrentTimeDisplayState();
 }
@@ -165,10 +161,10 @@ class _CurrentTimeDisplayState extends State<_CurrentTimeDisplay> {
     final minute = _now.minute.toString().padLeft(2, '0');
     return Text(
       '$hour:$minute',
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: HearthFont.hero, // was 72; snapped to hero=64 (12.5% delta)
         fontWeight: FontWeight.w200,
-        color: Colors.white,
+        color: widget.color,
       ),
     );
   }

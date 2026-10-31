@@ -6,6 +6,8 @@ import '../../config/hub_config.dart';
 import '../../modules/alarm_clock/alarm_editor_screen.dart';
 import '../../modules/alarm_clock/alarm_models.dart';
 import '../../modules/alarm_clock/alarm_service.dart';
+import '../../modules/alarm_clock/sunrise_controller.dart';
+import '../../services/home_assistant_service.dart';
 import '../framework/plugin_router.dart';
 import '../framework/web_context.dart';
 import '../hearth_plugin.dart';
@@ -18,7 +20,8 @@ import '../hearth_plugin.dart';
 ///
 /// The web portal reaches the same [AlarmService] singleton through this
 /// plugin's HTTP routes (the browser has no direct service access):
-///   * GET  `alarms`        — the live alarm list + available builtin tones.
+///   * GET  `alarms`        — the live alarm list, available builtin tones and
+///     the lights a sunrise can ramp.
 ///   * POST `alarms/save`   — upsert one alarm (add when its id is unknown,
 ///     otherwise update in place).
 ///   * POST `alarms/delete` — remove one alarm by id.
@@ -75,7 +78,7 @@ class AlarmClockPlugin extends HearthPlugin {
   @override
   void registerHttpRoutes(PluginRouter router) {
     // GET alarms — the current alarm list (each with a human day summary for
-    // the row) plus the builtin tones the editor's sound picker offers.
+    // the row) plus the builtin tones and lights the editor's pickers offer.
     router.get('alarms', (req) async {
       final service = req.readProvider(alarmServiceProvider);
       await req.respondJson({
@@ -85,6 +88,11 @@ class AlarmClockPlugin extends HearthPlugin {
         ],
         'tones': [
           for (final e in builtinTones.entries) {'id': e.key, 'name': e.value},
+        ],
+        'lights': [
+          for (final light in sunriseLightChoices(
+              req.readProvider(homeAssistantServiceProvider).entities.values))
+            {'id': light.entityId, 'name': light.name},
         ],
       });
     });
@@ -188,7 +196,7 @@ class _AlarmClockPanel extends ConsumerWidget {
 }
 
 /// Self-contained HTML + JS for the web alarm editor. No server-side
-/// interpolation: the panel fetches its alarms and tones at runtime from the
+/// interpolation: the panel fetches its alarms, tones and lights at runtime from the
 /// `alarms` GET route and persists through the `alarms/save` and
 /// `alarms/delete` POST routes (both via `hearth.action`, which scopes to this
 /// plugin's prefix). Values are written with `textContent` / form properties,
@@ -270,6 +278,7 @@ const _alarmsHtml = r'''
     if (!listEl) return;
     var alarms = [];
     var tones = [];
+    var lights = [];
 
     function status(msg) { statusEl.textContent = msg || ''; }
 
@@ -277,6 +286,7 @@ const _alarmsHtml = r'''
       hearth.action('alarms').then(function (data) {
         alarms = data.alarms || [];
         tones = data.tones || [];
+        lights = data.lights || [];
         renderList();
       }).catch(function (e) {
         listEl.textContent = 'Failed to load alarms.';
@@ -389,6 +399,46 @@ const _alarmsHtml = r'''
       });
       editorEl.appendChild(sunrise);
 
+      var lightsWrap = document.createElement('div');
+      lightsWrap.appendChild(flabel('Sunrise lights (come on dim when the sunrise starts)'));
+      var selLights = a && a.sunriseLights ? a.sunriseLights.slice() : [];
+      // A picked light Home Assistant no longer offers can still be unpicked.
+      var lightChoices = lights.slice();
+      selLights.forEach(function (id) {
+        if (!lights.some(function (l) { return l.id === id; })) {
+          lightChoices.push({ id: id, name: id });
+        }
+      });
+      if (lightChoices.length === 0) {
+        var noLights = document.createElement('div');
+        noLights.className = 'al-sub';
+        noLights.textContent = 'No dimmable lights found in Home Assistant';
+        lightsWrap.appendChild(noLights);
+      }
+      lightChoices.forEach(function (l) {
+        var row = document.createElement('label');
+        row.className = 'al-check';
+        var box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = selLights.indexOf(l.id) !== -1;
+        box.addEventListener('change', function () {
+          var i = selLights.indexOf(l.id);
+          if (box.checked && i === -1) selLights.push(l.id);
+          if (!box.checked && i !== -1) selLights.splice(i, 1);
+        });
+        var name = document.createElement('span');
+        name.textContent = l.name;
+        row.appendChild(box);
+        row.appendChild(name);
+        lightsWrap.appendChild(row);
+      });
+      function showLights() {
+        lightsWrap.style.display = sunrise.value === '0' ? 'none' : 'block';
+      }
+      sunrise.addEventListener('change', showLights);
+      showLights();
+      editorEl.appendChild(lightsWrap);
+
       editorEl.appendChild(flabel('Snooze duration'));
       var snooze = document.createElement('select');
       var curSnooze = a ? a.snoozeDuration : 10;
@@ -437,6 +487,7 @@ const _alarmsHtml = r'''
           oneTime: days.length === 0,
           soundId: sound.value,
           sunriseDuration: parseInt(sunrise.value, 10),
+          sunriseLights: selLights,
           snoozeDuration: parseInt(snooze.value, 10),
           volume: parseInt(volume.value, 10) / 100
         };

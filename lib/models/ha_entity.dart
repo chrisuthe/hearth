@@ -30,6 +30,13 @@ class HaEntity {
   // HA reports brightness as 0-255 int; UI layer converts to percentage.
   int? get brightness => attributes['brightness'] as int?;
 
+  /// Whether a light can be set below full. `onoff` is the one colour mode
+  /// without brightness: Home Assistant drops the brightness and turns it on.
+  bool get isDimmable {
+    final modes = attributes['supported_color_modes'];
+    return modes is List && modes.any((m) => m != 'onoff' && m != 'unknown');
+  }
+
   // Color temperature in mireds (HA's native unit for color temp).
   double? get colorTemp => (attributes['color_temp'] as num?)?.toDouble();
 
