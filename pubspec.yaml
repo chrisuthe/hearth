@@ -13,7 +13,7 @@ dependencies:
   dio: ^5.7.0
   material_color_utilities: ^0.13.0
   web_socket_channel: ^3.0.1
-  cached_network_image: 4.0.4
+  cached_network_image: 4.0.5
   path_provider: ^2.1.4
   # Video playback for live camera streams via RTSP.
   # media_kit wraps libmpv — works on Windows, Linux x64, Linux ARM64, and Android.
@@ -26,7 +26,7 @@ dependencies:
   # Experimental Android target — see docs/specs/2026-10-13-android-apk-requirements.md
   media_kit_libs_android_video: ^1.3.8
   video_player: ^2.9.1
-  bonsoir: 7.1.5
+  bonsoir: 7.1.6
   ffi: ^2.2.0
   sendspin_dart:
     git:
