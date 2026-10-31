@@ -35,9 +35,13 @@ saved on the device and survive restarts. The **next** alarm is also published t
 Assistant if you've set up **[[Home Assistant Device (MQTT)]]**, which can also create, delete,
 snooze, and dismiss alarms.
 
-> **Not wired up yet:** alarms don't play a sound — **Sound** and **Volume** are saved with the
-> alarm but no tone plays, so the alert is visual only. The **Sunrise effect** is saved too
-> but doesn't run yet. And a snoozed alarm doesn't come back on its own after the snooze time.
+When an alarm fires, its **Sound** loops at its **Volume** until you snooze or dismiss it, and a
+snoozed alarm rings again when the snooze time ends. If nobody responds, the sound stops after
+30 minutes and the alarm stays on screen. A snooze doesn't survive restarting Hearth. An alarm
+rings within a few seconds of its time, and if Hearth was off and comes back more than a minute
+late, it waits for the alarm's next time.
+
+> **Not wired up yet:** the **Sunrise effect** is saved with the alarm but doesn't run.
 
 ![The alarm editor with time, repeat days, sunrise, and sound](images/alarm-editor.png)
 *📷 Planned screenshot — the alarm editor. See [[SHOTLIST]].*
@@ -67,13 +71,18 @@ Assistant** over MQTT.
 ## On Android
 
 On an [[Android tablet|Android Tablet]], alarms and timers show the same screens and alerts.
-There's no timer beep: a finished timer rings through the built-in
-[[voice satellite|Voice Satellite]] when the satellite is running, and is silent otherwise.
-Timers you set by voice through that satellite also show on the timer screen and ring there.
+A finished timer rings through the built-in [[voice satellite|Voice Satellite]] when the satellite
+is running, and beeps otherwise. Timers you set by voice through that satellite also show on the
+timer screen and ring there.
+
+Two different volumes apply. Timer beeps use the tablet's media volume, which Hearth's own slider
+controls. Alarm tones use the tablet's **alarm volume**, set in Android's settings, so turning
+music down at bedtime can't silence an alarm. Each alarm's **Volume** setting applies on top.
 
 ## Troubleshooting
 
 - **Sunrise did nothing** — the sunrise effect isn't wired up yet (see above).
-- **Alarm didn't make a sound** — alarm tones aren't played yet; the alert is visual only.
-- **Timer didn't beep** — on the Pi, check the system volume (Menu 2 /
-  **[[Navigation & Gestures]]**). On Android, turn on the voice satellite to hear timers.
+- **Alarm didn't make a sound** — on the Pi, check the system volume (Menu 2 /
+  **[[Navigation & Gestures]]**). On Android, check the tablet's alarm volume in its settings.
+- **Timer didn't beep** — check the system volume (Menu 2 / **[[Navigation & Gestures]]**). On
+  Android, that's the media volume.
