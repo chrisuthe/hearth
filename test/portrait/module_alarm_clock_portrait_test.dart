@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hearth/models/ha_entity.dart';
 import 'package:hearth/modules/alarm_clock/alarm_editor_screen.dart';
 import 'package:hearth/modules/alarm_clock/alarm_models.dart';
 import 'package:hearth/modules/alarm_clock/alarm_service.dart';
+import 'package:hearth/services/home_assistant_service.dart';
 
 import 'module_support.dart';
 import 'portrait_harness.dart';
@@ -36,6 +38,16 @@ const _alarms = [
   Alarm(id: 'a6', time: '21:55', label: 'Wind down', days: [7], sunriseDuration: 0),
   Alarm(id: 'a7', time: '23:10', label: 'Take bins out', days: [2]),
 ];
+
+HaEntity _light(String id, String name) => HaEntity(
+      entityId: id,
+      state: 'off',
+      attributes: {
+        'friendly_name': name,
+        'supported_color_modes': ['brightness'],
+      },
+      lastChanged: DateTime(2026),
+    );
 
 void main() {
   Widget screen() => staticModule('alarm_clock').buildScreen(isActive: true);
@@ -91,5 +103,38 @@ void main() {
       expect(r.left, greaterThanOrEqualTo(0));
       expect(r.right, lessThanOrEqualTo(canvas.width));
     }
+  });
+
+  testLayouts('alarm editor with many sunrise lights to pick',
+      (tester, canvas) async {
+    await pumpModule(
+      tester,
+      const AlarmEditorScreen(
+        alarm: Alarm(
+          id: 'a1',
+          time: '06:15',
+          sunriseDuration: 15,
+          sunriseLights: ['light.l0'],
+        ),
+      ),
+      overrides: [
+        alarmServiceProvider.overrideWith((ref) => _FixedAlarms(const [])),
+        homeAssistantServiceProvider.overrideWith((ref) => FakeHomeAssistant([
+              _light('light.long', kLongName),
+              for (var i = 0; i < 20; i++) _light('light.l$i', 'Lamp $i'),
+            ])),
+      ],
+    );
+    final long = find.text(kLongName);
+    await tester.ensureVisible(long);
+    await tester.pump();
+    final r = tester.getRect(long);
+    expect(r.left, greaterThanOrEqualTo(0));
+    expect(r.right, lessThanOrEqualTo(canvas.width));
+    // The picker doesn't push the actions off the end of the scroll.
+    await tester.scrollUntilVisible(find.text('Save'), 200,
+        scrollable: find.byType(Scrollable).first);
+    expect(tester.getRect(find.text('Save')).bottom,
+        lessThanOrEqualTo(canvas.height));
   });
 }

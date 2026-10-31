@@ -84,7 +84,9 @@ Hearth listens on these topics. Publish to them from Home Assistant automations 
 
 For `alarm/create`: `time` is 24-hour `HH:MM`; `days` uses ISO weekdays (1 = Monday …
 7 = Sunday), and an empty or missing list makes a one-time alarm; `label` and
-`sunrise_duration` (minutes) are optional.
+`sunrise_duration` (minutes) are optional, and without `sunrise_duration` the alarm has no
+sunrise. Sunrise lights are chosen in the alarm's editor. `alarm/snooze` and `alarm/dismiss` move
+the sunrise just as the on-screen buttons do.
 
 A timer started this way behaves like one set on the kiosk — see [[Alarms & Timers]]. (Timers
 set through the [[Android voice satellite|Voice Satellite]] belong to Home Assistant and are

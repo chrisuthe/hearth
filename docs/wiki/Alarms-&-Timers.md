@@ -23,7 +23,7 @@ All three edit the same list. Each alarm has:
 | **Time** | When the alarm fires (24-hour HH:MM). |
 | **Label** | Optional name shown for the alarm. |
 | **Repeat** | Day-of-week toggles (M T W T F S S). Leave all off for a **one-time** alarm. |
-| **Sunrise effect** | Off, or a **Duration** of 5–30 min. Off by default. |
+| **Sunrise effect** | Off, or a **Duration** of 5–30 min and any **Lights** to bring up with it. Off by default. |
 | **Sound** | *Gentle Morning* (default), *Birdsong*, *Classic*, or *Bright Day*. |
 | **Snooze duration** | 5, 10, 15, or 20 min; default 10. |
 | **Volume** | 0–100%; default 70%. |
@@ -45,13 +45,39 @@ If another alarm comes due while one is ringing, it rings as soon as the first i
 dismissed. If the first has already gone quiet after its 30 minutes, the new alarm takes over and
 the first counts as dismissed.
 
-> **Not wired up yet:** the **Sunrise effect** is saved with the alarm but doesn't run.
+### Sunrise
+
+An alarm with a **Sunrise effect** starts it that many minutes before its time: a 7:00 alarm
+with a 15-minute sunrise starts at 6:45. If you save the alarm, or Hearth restarts, partway
+through those minutes, the sunrise picks up where it would have been.
+
+**On the screen**, the photos fade down over the first third, then warm through orange to a pale
+gold by the time the alarm rings. It's a tint over the photos and can't change the panel's own
+brightness. You'll see it on Home and other screens that show the photo behind them. Screens with
+a solid background, such as Calendar or Settings, cover it until Hearth goes idle and returns
+Home.
+
+**Lights** are optional and chosen per alarm, in the same editor. Only lights that can dim are
+offered, because an on/off light would come on fully at the start. Chosen lights start at their
+lowest level and reach full when the alarm rings, going from warm (2200K) to cooler white (4000K);
+lights without colour control change brightness only. Hearth sends the level every 30 seconds, so
+a light you turn off during a sunrise comes back on at the next step. Lights need a connection to
+[[Home Assistant|Home Assistant Controls]].
+
+| When you… | Screen | Lights |
+| --- | --- | --- |
+| **Snooze** | Drops back to dark purple and climbs again until it rings | Drop to 30% warm and climb again until it rings |
+| **Dismiss** | Tint ends | Stay as they are |
+| Turn off, delete, or move the alarm during a sunrise | Tint ends | Stay as they are |
+
+Lights never turn off by themselves, even if nobody responds to the alarm. Snoozing, dismissing and
+the rest work the same from the kiosk, the web portal, or Home Assistant.
 
 ![The alarm editor with time, repeat days, sunrise, and sound](images/alarm-editor.png)
 *📷 Planned screenshot — the alarm editor. See [[SHOTLIST]].*
 
 Scripts can also list, create, update, and delete alarms through `/api/alarms` with the
-portal's [[API key|The Web Portal]].
+portal's [[API key|The Web Portal]]. An alarm created without `sunriseDuration` has no sunrise.
 
 ## Timers
 
@@ -83,9 +109,17 @@ Two different volumes apply. Timer beeps use the tablet's media volume, which He
 controls. Alarm tones use the tablet's **alarm volume**, set in Android's settings, so turning
 music down at bedtime can't silence an alarm. Each alarm's **Volume** setting applies on top.
 
+The sunrise tint only shows while Hearth is on screen. If another app is in front, the lights still
+ramp and Hearth comes forward when the alarm rings.
+
 ## Troubleshooting
 
-- **Sunrise did nothing** — the sunrise effect isn't wired up yet (see above).
+- **Sunrise did nothing on screen** — check the alarm has a **Sunrise effect** set, and that you're
+  on Home or another screen that shows the photo; solid screens cover the tint.
+- **Sunrise lights didn't come on** — check they're ticked on that alarm and that Hearth is connected
+  to Home Assistant.
+- **A light isn't offered for the sunrise** — it can only turn on and off, or Home Assistant isn't
+  reporting it right now.
 - **Alarm didn't make a sound** — on the Pi, check the system volume (Menu 2 /
   **[[Navigation & Gestures]]**). On Android, check the tablet's alarm volume in its settings.
 - **Timer didn't beep** — check the system volume (Menu 2 / **[[Navigation & Gestures]]**). On

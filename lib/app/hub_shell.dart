@@ -584,7 +584,7 @@ class _SunriseGradientLayer extends ConsumerWidget {
     return Positioned.fill(
       child: IgnorePointer(
         child: Container(
-          color: sunrise.currentColor.withValues(alpha: 0.7),
+          color: sunrise.currentColor.withValues(alpha: sunrise.overlayAlpha),
         ),
       ),
     );

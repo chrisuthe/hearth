@@ -21,7 +21,7 @@ class Alarm {
     this.enabled = true,
     this.days = const [],
     this.oneTime = false,
-    this.sunriseDuration = 15,
+    this.sunriseDuration = 0,
     this.sunriseLights = const [],
     this.soundType = 'builtin',
     this.soundId = 'gentle_morning',
@@ -84,7 +84,7 @@ class Alarm {
         enabled: json['enabled'] as bool? ?? true,
         days: (json['days'] as List<dynamic>?)?.cast<int>() ?? const [],
         oneTime: json['oneTime'] as bool? ?? false,
-        sunriseDuration: json['sunriseDuration'] as int? ?? 15,
+        sunriseDuration: json['sunriseDuration'] as int? ?? 0,
         sunriseLights:
             (json['sunriseLights'] as List<dynamic>?)?.cast<String>() ??
                 const [],

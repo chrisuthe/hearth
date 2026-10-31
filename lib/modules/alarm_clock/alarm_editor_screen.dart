@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/theme/hearth_colors.dart';
 import '../../app/tokens/tokens.dart';
+import '../../services/home_assistant_service.dart';
 import '../../widgets/themed_background.dart';
 import 'alarm_models.dart';
 import 'alarm_service.dart';
+import 'sunrise_controller.dart';
 
 /// Available builtin alarm tones. Must match [AlarmAudioPlayer.builtinTones]
 /// in alarm_audio.dart — both lists exist for layering reasons but ought to
@@ -37,6 +39,7 @@ class _AlarmEditorScreenState extends ConsumerState<AlarmEditorScreen> {
   late String _label;
   late bool _sunriseEnabled;
   late int _sunriseDuration;
+  late List<String> _sunriseLights;
   late String _soundId;
   late int _snoozeDuration;
   late double _volume;
@@ -53,7 +56,8 @@ class _AlarmEditorScreenState extends ConsumerState<AlarmEditorScreen> {
     _days = List<int>.from(a?.days ?? []);
     _label = a?.label ?? '';
     _sunriseEnabled = (a?.sunriseDuration ?? 0) > 0;
-    _sunriseDuration = a?.sunriseDuration ?? 15;
+    _sunriseDuration = _sunriseEnabled ? a!.sunriseDuration : 15;
+    _sunriseLights = List<String>.from(a?.sunriseLights ?? []);
     _soundId = a?.soundId ?? 'gentle_morning';
     _snoozeDuration = a?.snoozeDuration ?? 10;
     _volume = a?.volume ?? 0.7;
@@ -77,6 +81,7 @@ class _AlarmEditorScreenState extends ConsumerState<AlarmEditorScreen> {
       days: _days,
       oneTime: _days.isEmpty,
       sunriseDuration: _sunriseEnabled ? _sunriseDuration : 0,
+      sunriseLights: _sunriseLights,
       soundId: _soundId,
       snoozeDuration: _snoozeDuration,
       volume: _volume,
@@ -340,7 +345,65 @@ class _AlarmEditorScreenState extends ConsumerState<AlarmEditorScreen> {
               );
             }).toList(),
           ),
+          const SizedBox(height: HearthSpacing.x3),
+          _buildSunriseLights(),
         ],
+      ],
+    );
+  }
+
+  Widget _buildSunriseLights() {
+    final c = context.hearthColors;
+    final entities = ref.watch(homeAssistantServiceProvider).entities;
+    final offered = sunriseLightChoices(entities.values);
+    final choices = [
+      for (final light in offered) (id: light.entityId, name: light.name),
+      // A picked light Home Assistant no longer offers can still be unpicked.
+      for (final id in _sunriseLights)
+        if (!offered.any((l) => l.entityId == id))
+          (id: id, name: entities[id]?.name ?? id),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Lights (come on dim when the sunrise starts)',
+          style: TextStyle(fontSize: 12, color: c.textMuted), // equidistant caption=11/label=13
+        ),
+        const SizedBox(height: 6), // equidistant x1=4/x2=8
+        if (choices.isEmpty)
+          Text(
+            'No dimmable lights found in Home Assistant',
+            style: TextStyle(fontSize: HearthFont.caption, color: c.textMuted),
+          )
+        else
+          Wrap(
+            spacing: HearthSpacing.x2,
+            runSpacing: HearthSpacing.x1,
+            children: choices.map((light) {
+              final selected = _sunriseLights.contains(light.id);
+              return FilterChip(
+                label: Text(light.name, overflow: TextOverflow.ellipsis),
+                selected: selected,
+                onSelected: (on) => setState(() {
+                  if (on) {
+                    _sunriseLights.add(light.id);
+                  } else {
+                    _sunriseLights.remove(light.id);
+                  }
+                }),
+                selectedColor: c.accentFill,
+                backgroundColor: c.raised,
+                checkmarkColor: c.onAccent,
+                labelStyle: TextStyle(
+                  color: selected ? c.onAccent : c.textSecondary,
+                  fontSize: 12, // equidistant caption=11/label=13
+                ),
+                side: BorderSide.none,
+                visualDensity: VisualDensity.compact,
+              );
+            }).toList(),
+          ),
       ],
     );
   }

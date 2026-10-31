@@ -9,6 +9,7 @@ import 'package:hearth/app/screen_navigator.dart';
 import 'package:hearth/config/hub_config.dart';
 import 'package:hearth/config/webview_config.dart';
 import 'package:hearth/models/hearth_notification.dart';
+import 'package:hearth/modules/alarm_clock/sunrise_controller.dart';
 import 'package:hearth/screens/home/home_screen.dart';
 import 'package:hearth/services/music_assistant_service.dart';
 import 'package:hearth/services/notification_service.dart';
@@ -62,6 +63,7 @@ Future<void> _pumpShell(
   HubConfig? config,
   NotificationService? notifications,
   VoiceAssistantState voice = const VoiceAssistantState(),
+  SunriseController? sunrise,
 }) async {
   final deck = notifications ?? silentNotifications();
   final timers = TimerService()
@@ -78,6 +80,8 @@ Future<void> _pumpShell(
       maAllPlayersProvider
           .overrideWith((ref) => Stream.value(samplePlayers())),
       voiceAssistantStateProvider.overrideWith((ref) => Stream.value(voice)),
+      if (sunrise != null)
+        sunriseControllerProvider.overrideWith((ref) => sunrise),
     ],
     // The observer as HearthApp registers it, so pushed routes publish.
     child: Consumer(
@@ -106,6 +110,22 @@ Future<void> _swipeFromEdge(
 }
 
 void main() {
+  testLayouts('HubShell tints the photos during a sunrise',
+      (tester, canvas) async {
+    final sunrise = SunriseController();
+    final past = DateTime.now().subtract(const Duration(minutes: 1));
+    sunrise.run(alarmId: 'a1', start: past, end: past);
+    await _pumpShell(tester, sunrise: sunrise);
+
+    final tint = sunrise.currentColor.withValues(alpha: sunrise.overlayAlpha);
+    final layer = find.byWidgetPredicate(
+        (w) => w is Container && w.color == tint);
+    expect(layer, findsOneWidget);
+    expect(tester.getSize(layer), canvas);
+    expect(find.byType(HomeScreen), findsOneWidget);
+    await unmount(tester);
+  });
+
   testLayouts('HubShell tracks an edge-menu module route',
       (tester, canvas) async {
     await _pumpShell(tester);

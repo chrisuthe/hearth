@@ -10,6 +10,7 @@ import 'package:hearth/models/hearth_notification.dart';
 import 'package:hearth/modules/alarm_clock/alarm_alert_overlay.dart';
 import 'package:hearth/modules/alarm_clock/alarm_models.dart';
 import 'package:hearth/modules/alarm_clock/alarm_service.dart';
+import 'package:hearth/modules/alarm_clock/sunrise_controller.dart';
 import 'package:hearth/modules/cameras/camera_feed_overlay.dart';
 import 'package:hearth/modules/cameras/frigate_service.dart';
 import 'package:hearth/modules/livetv/live_tv_overlay.dart';
@@ -193,6 +194,28 @@ void main() {
       );
       expect(find.text('Dismiss'), findsOneWidget);
       expect(find.text('Tap anywhere to snooze'), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testLayoutsAndSplitHalves('ringing at the end of a sunrise', (tester, canvas) async {
+      final sunrise = SunriseController();
+      final past = DateTime.now().subtract(const Duration(minutes: 1));
+      sunrise.run(alarmId: 'a1', start: past, end: past);
+      await _pumpOverlay(
+        tester,
+        AlarmAlertOverlay(onWake: () {}),
+        overrides: [
+          sunriseControllerProvider.overrideWith((ref) => sunrise),
+          alarmServiceProvider.overrideWith((ref) => _RingingAlarmService(
+                const Alarm(id: 'a1', time: '06:30', label: 'Wake up'),
+              )),
+        ],
+      );
+      // Dark ink on the pale gold, where the white it uses on black can't be read.
+      Color? colorOf(String text) =>
+          tester.widget<Text>(find.text(text)).style?.color;
+      expect(colorOf('Dismiss'), Colors.black);
+      expect(colorOf('Wake up')?.withValues(alpha: 1), Colors.black);
       await unmount(tester);
     });
   });
