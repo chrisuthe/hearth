@@ -13,7 +13,7 @@ dependencies:
   dio: ^5.7.0
   material_color_utilities: ^0.13.0
   web_socket_channel: ^3.0.1
-  cached_network_image: 4.0.6
+  cached_network_image: 4.0.7
   path_provider: ^2.1.4
   # Video playback for live camera streams via RTSP.
   # media_kit wraps libmpv — works on Windows, Linux x64, Linux ARM64, and Android.
