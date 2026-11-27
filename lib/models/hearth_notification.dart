@@ -112,6 +112,10 @@ class HearthNotification {
   /// Close the card this long after its last update.
   final Duration? timeout;
 
+  /// A doorbell press. With [camera], an Android Hearth opens the doorbell
+  /// call view for it; see `DoorbellCallController`.
+  final bool ring;
+
   const HearthNotification({
     required this.id,
     required this.source,
@@ -128,6 +132,7 @@ class HearthNotification {
     this.camera,
     this.tag,
     this.timeout,
+    this.ring = false,
   });
 
   /// The card id for a [tag]. A stable id is what makes an update land on the
@@ -161,6 +166,7 @@ class HearthNotification {
         camera: camera,
         tag: tag,
         timeout: timeout,
+        ring: ring,
       );
 
   /// Normalize an inbound ingest payload (shared by the MQTT `.../notify`
@@ -169,7 +175,8 @@ class HearthNotification {
   /// Recognized keys: `title`, `message` (aka `body`), `priority`
   /// (`alert`|`info`, default `info`), `sticky` (default: sticky for alerts,
   /// transient for info), `source` (default [fallbackSource]), `source_label`,
-  /// `muted`, `image`, `image_refresh`, `camera`, `tag` and `timeout`. A
+  /// `muted`, `image`, `image_refresh`, `camera`, `tag`, `timeout` and `ring`
+  /// (only a boolean `true` counts). A
   /// `timeout` takes precedence over `sticky`, and a refreshing picture with no
   /// `timeout` gets [kDefaultRefreshingCardTimeout]. Returns null when neither
   /// a title nor a body is present so the caller can reject an empty
@@ -215,6 +222,7 @@ class HearthNotification {
       camera: _optionalString(json['camera']),
       tag: tag,
       timeout: timeout,
+      ring: json['ring'] == true,
     );
   }
 }
