@@ -51,6 +51,7 @@ dependencies:
   flutter_inappwebview_platform_interface: 1.4.0-beta.3
   rrule: 0.2.18
   timezone: 0.11.2
+  flutter_webrtc: 1.6.3
 
 dev_dependencies:
   flutter_test:
