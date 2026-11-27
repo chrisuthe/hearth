@@ -169,6 +169,24 @@ void main() {
     expect(rtc.receives, 0);
   });
 
+  test('hang up while talk is connecting aborts it at once', () async {
+    final session = build();
+    await session.start();
+    rtc.pendingTalk = Completer<FakeLink>();
+    final talking = session.setTalk(true);
+    await pumpEventQueue();
+
+    var aborted = false;
+    unawaited(rtc.lastAbort!.then((_) => aborted = true));
+    await session.dispose();
+    await pumpEventQueue();
+    expect(aborted, isTrue);
+
+    rtc.pendingTalk!.completeError(const RtcUnavailable('aborted'));
+    expect(await talking, TalkResult.failed);
+    expect(session.talking.value, isFalse);
+  });
+
   test('setTalk after dispose never opens the mic', () async {
     final session = build();
     await session.start();

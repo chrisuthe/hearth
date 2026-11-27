@@ -48,6 +48,10 @@ class DoorbellCallSession {
   Future<TalkResult> _talkQueue = Future.value(TalkResult.off);
   bool _begun = false;
   bool _disposed = false;
+
+  /// Completed by [dispose], so a Talk still connecting lets go of the
+  /// microphone at once rather than when it connects or times out.
+  final _abort = Completer<void>();
   Future<void>? _disposing;
 
   /// The doorbell's video and audio, once connected.
@@ -101,7 +105,8 @@ class DoorbellCallSession {
 
     final RtcTalkLink link;
     try {
-      link = await _rtc.talk(_signaling, timeout: kDoorbellConnectTimeout);
+      link = await _rtc.talk(_signaling,
+          timeout: kDoorbellConnectTimeout, abort: _abort.future);
     } on MicDenied {
       return TalkResult.micDenied;
     } catch (e) {
@@ -135,6 +140,7 @@ class DoorbellCallSession {
 
   Future<void> _dispose() async {
     _disposed = true;
+    _abort.complete();
     try {
       await _closeTalk();
       final media = _media.value;

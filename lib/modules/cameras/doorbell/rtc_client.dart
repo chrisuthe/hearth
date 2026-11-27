@@ -45,8 +45,11 @@ abstract class RtcTalkLink {
 abstract class RtcClient {
   Future<RtcReceiveLink> receive(Uri signaling, {required Duration timeout});
 
-  /// Opens the microphone. Throws [MicDenied] or [RtcUnavailable].
-  Future<RtcTalkLink> talk(Uri signaling, {required Duration timeout});
+  /// Opens the microphone. Throws [MicDenied] or [RtcUnavailable]. When
+  /// [abort] completes before the connection is up, the attempt stops and
+  /// releases the microphone at once.
+  Future<RtcTalkLink> talk(Uri signaling,
+      {required Duration timeout, Future<void>? abort});
 }
 
 /// [RtcClient] over flutter_webrtc and go2rtc's WebSocket signalling.
@@ -132,7 +135,8 @@ class FlutterWebrtcClient implements RtcClient {
   }
 
   @override
-  Future<RtcTalkLink> talk(Uri signaling, {required Duration timeout}) async {
+  Future<RtcTalkLink> talk(Uri signaling,
+      {required Duration timeout, Future<void>? abort}) async {
     await _initialize();
     final MediaStream mic;
     try {
@@ -165,7 +169,7 @@ class FlutterWebrtcClient implements RtcClient {
             direction: TransceiverDirection.SendOnly, streams: [mic]),
       );
       link = _WebrtcLink(pc, onClose: releaseMic);
-      await _negotiate(pc, signaling, timeout, link);
+      await _negotiate(pc, signaling, timeout, link, abort: abort);
       // As the Advanced Camera Card checks: a doorbell without a backchannel
       // connects but never takes the audio. Read the transceiver afresh:
       // flutter_webrtc disposes the one addTransceiver returned once the
@@ -184,6 +188,7 @@ class FlutterWebrtcClient implements RtcClient {
         await link.close();
       } else {
         await pc?.close();
+        await pc?.dispose();
         await releaseMic();
       }
       rethrow;
@@ -193,14 +198,17 @@ class FlutterWebrtcClient implements RtcClient {
   /// Offers over go2rtc's WebSocket and waits for `connected`. The socket
   /// is closed once connected, as the Advanced Camera Card does: the
   /// connection no longer needs it.
-  static Future<void> _negotiate(RTCPeerConnection pc, Uri uri,
-      Duration timeout, _WebrtcLink link) async {
+  static Future<void> _negotiate(
+      RTCPeerConnection pc, Uri uri, Duration timeout, _WebrtcLink link,
+      {Future<void>? abort}) async {
     final connected = Completer<void>();
     void fail(String reason) {
       if (!connected.isCompleted) {
         connected.completeError(RtcUnavailable(reason));
       }
     }
+
+    unawaited(abort?.then((_) => fail('aborted')));
 
     final WebSocketChannel channel;
     try {
@@ -304,7 +312,11 @@ class _WebrtcLink {
     _closed = true;
     _pc.onConnectionState = null;
     try {
+      // close() alone keeps the native connection, and the plugin's audio
+      // switch (with its audio focus) stays started until the last
+      // connection is disposed.
       await _pc.close();
+      await _pc.dispose();
     } finally {
       await _onClose();
       await _lost.close();

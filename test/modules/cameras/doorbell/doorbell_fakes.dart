@@ -102,9 +102,14 @@ class FakeRtcClient implements RtcClient {
     return link;
   }
 
+  /// The abort signal the last talk() was given.
+  Future<void>? lastAbort;
+
   @override
-  Future<RtcTalkLink> talk(Uri signaling, {required Duration timeout}) async {
+  Future<RtcTalkLink> talk(Uri signaling,
+      {required Duration timeout, Future<void>? abort}) async {
     talks++;
+    lastAbort = abort;
     log.add('talk');
     if (pendingTalk != null) return pendingTalk!.future;
     if (talkError != null) throw talkError!;
