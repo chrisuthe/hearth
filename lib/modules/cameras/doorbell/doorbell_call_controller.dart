@@ -119,6 +119,7 @@ class DoorbellCallController extends StateNotifier<DoorbellCall?> {
   final DateTime Function() _now;
 
   Timer? _deadline;
+  DateTime? _closeAt;
   Timer? _noticeTimer;
   HearthNotification? _pending;
   Timer? _pendingTimer;
@@ -162,7 +163,10 @@ class DoorbellCallController extends StateNotifier<DoorbellCall?> {
       openedAt: openedAt,
       session: session,
     );
-    _arm(openedAt.add(ring.timeout ?? kDoorbellQuietTimeout));
+    // The ring's own timeout only: a picture card's 10-minute default is
+    // for the card, not the call.
+    _arm(openedAt.add(
+        ring.timeoutGiven ? ring.timeout! : kDoorbellQuietTimeout));
     unawaited(_start(session));
   }
 
@@ -208,9 +212,9 @@ class DoorbellCallController extends StateNotifier<DoorbellCall?> {
     if (current == null || current.session != call.session) return;
     switch (result) {
       case TalkResult.on:
-        if (!current.talkUsed) {
-          _arm(current.openedAt.add(kCameraFeedMaxDuration));
-        }
+        // Talk never shortens the view, even past the 5-minute cap.
+        final cap = current.openedAt.add(kCameraFeedMaxDuration);
+        if (!current.talkUsed && cap.isAfter(_closeAt!)) _arm(cap);
         state = current.copyWith(talkOn: true, talkUsed: true);
       case TalkResult.off:
         state = current.copyWith(talkOn: false);
@@ -250,6 +254,7 @@ class DoorbellCallController extends StateNotifier<DoorbellCall?> {
 
   void _arm(DateTime closeAt) {
     _deadline?.cancel();
+    _closeAt = closeAt;
     final left = closeAt.difference(_now());
     _deadline = Timer(left.isNegative ? Duration.zero : left, _close);
   }

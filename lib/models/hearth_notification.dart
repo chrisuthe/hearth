@@ -112,6 +112,10 @@ class HearthNotification {
   /// Close the card this long after its last update.
   final Duration? timeout;
 
+  /// [timeout] came from the payload, not from the default a refreshing
+  /// picture gets.
+  final bool timeoutGiven;
+
   /// A doorbell press. With [camera], an Android Hearth opens the doorbell
   /// call view for it; see `DoorbellCallController`.
   final bool ring;
@@ -132,6 +136,7 @@ class HearthNotification {
     this.camera,
     this.tag,
     this.timeout,
+    this.timeoutGiven = false,
     this.ring = false,
   });
 
@@ -166,6 +171,7 @@ class HearthNotification {
         camera: camera,
         tag: tag,
         timeout: timeout,
+        timeoutGiven: timeoutGiven,
         ring: ring,
       );
 
@@ -201,7 +207,8 @@ class HearthNotification {
             requestedRefresh >= const Duration(seconds: 1)
         ? requestedRefresh
         : const Duration(seconds: 1);
-    final timeout = _optionalSeconds(json['timeout']) ??
+    final givenTimeout = _optionalSeconds(json['timeout']);
+    final timeout = givenTimeout ??
         (imageRefresh != null ? kDefaultRefreshingCardTimeout : null);
 
     return HearthNotification(
@@ -222,6 +229,7 @@ class HearthNotification {
       camera: _optionalString(json['camera']),
       tag: tag,
       timeout: timeout,
+      timeoutGiven: givenTimeout != null,
       ring: json['ring'] == true,
     );
   }

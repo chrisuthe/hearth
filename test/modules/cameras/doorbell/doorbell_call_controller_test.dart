@@ -133,6 +133,40 @@ void main() {
     });
   });
 
+  test('a picture ring without a timeout still closes at 3 min', () {
+    fakeAsync((async) {
+      final rig = _Rig(async);
+      rig.controller.ring(HearthNotification.fromIngest({
+        'tag': 'front_doorbell',
+        'title': 'Doorbell rang at Front Door',
+        'camera': 'FrontDoorbell',
+        'image': '/api/camera_proxy/camera.frontdoorbell',
+        'image_refresh': 3,
+        'ring': true,
+      })!);
+      async.elapse(const Duration(minutes: 3) - const Duration(seconds: 1));
+      expect(rig.call, isNotNull);
+      async.elapse(const Duration(seconds: 2));
+      expect(rig.call, isNull);
+    });
+  });
+
+  test('turning talk on never shortens the view', () {
+    fakeAsync((async) {
+      final rig = _Rig(async);
+      rig.controller.ring(_ring(timeout: 600));
+      async.elapse(const Duration(minutes: 6));
+      rig.controller.setTalk(true);
+      async.flushMicrotasks();
+      expect(rig.call?.talkOn, isTrue);
+
+      async.elapse(const Duration(minutes: 3, seconds: 59)); // 9:59
+      expect(rig.call, isNotNull);
+      async.elapse(const Duration(seconds: 2));
+      expect(rig.call, isNull);
+    });
+  });
+
   test('talk extends the life to 5 min from opening', () {
     fakeAsync((async) {
       final rig = _Rig(async);
