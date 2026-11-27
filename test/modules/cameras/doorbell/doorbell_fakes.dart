@@ -20,6 +20,10 @@ class FakeDoorbellPlatform implements DoorbellPlatform {
   bool beginThrows = false;
   Completer<void>? pendingBegin;
   int ends = 0;
+
+  /// The native hold is one process-wide flag, not a count: the last of
+  /// begin and end wins.
+  bool held = false;
   final summons = <String>[];
 
   @override
@@ -27,11 +31,13 @@ class FakeDoorbellPlatform implements DoorbellPlatform {
     log.add('begin');
     if (pendingBegin != null) await pendingBegin!.future;
     if (beginThrows) throw StateError('begin refused');
+    held = true;
   }
 
   @override
   Future<void> end() async {
     ends++;
+    held = false;
     log.add('end');
   }
 

@@ -31,7 +31,7 @@ class _Rig {
           signaling: Uri.parse('ws://10.0.2.2:1984/api/ws?src=$camera'),
           rtc: rtc,
           platform: platform,
-          muteHearthPlayback: (_) {},
+          muteHearthPlayback: (active) => playbackMuted = active,
           onLost: onLost,
           onTalkLost: onTalkLost,
         );
@@ -56,6 +56,9 @@ class _Rig {
   final fallbacks = <String>[];
   var feedCloses = 0;
   var foreground = true;
+
+  /// AudioCoordinator's call mute, which is one flag like the native hold.
+  var playbackMuted = false;
 
   DoorbellCall? get call => controller.state;
 
@@ -190,6 +193,35 @@ void main() {
       expect(rig.call?.camera, 'GarageDoorbell');
       expect(rig.sessions, hasLength(2));
       rig.expectReleased();
+    });
+  });
+
+  test('a replacing ring keeps the hold and the mute for the new call', () {
+    fakeAsync((async) {
+      final rig = _Rig(async);
+      rig.controller.ring(_ring());
+      async.flushMicrotasks();
+      rig.controller.ring(_ring(camera: 'GarageDoorbell', tag: 'garage'));
+      async.flushMicrotasks();
+
+      expect(rig.call?.connected, isTrue);
+      expect(rig.platform.held, isTrue);
+      expect(rig.playbackMuted, isTrue);
+    });
+  });
+
+  test('a ring straight after hang up keeps the hold', () {
+    fakeAsync((async) {
+      final rig = _Rig(async);
+      rig.controller.ring(_ring());
+      async.flushMicrotasks();
+      rig.controller.hangUp();
+      rig.controller.ring(_ring());
+      async.flushMicrotasks();
+
+      expect(rig.call?.connected, isTrue);
+      expect(rig.platform.held, isTrue);
+      expect(rig.playbackMuted, isTrue);
     });
   });
 

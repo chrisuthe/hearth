@@ -123,6 +123,11 @@ class DoorbellCallController extends StateNotifier<DoorbellCall?> {
   HearthNotification? _pending;
   Timer? _pendingTimer;
 
+  /// Completes when every closed session has released its hold. The native
+  /// hold and the playback mute are single flags, so a new call must not
+  /// take them before the old call's release lands.
+  Future<void>? _released;
+
   void ring(HearthNotification ring) {
     if (ring.camera == null) return;
     if (!_isForeground()) {
@@ -162,6 +167,11 @@ class DoorbellCallController extends StateNotifier<DoorbellCall?> {
   }
 
   Future<void> _start(DoorbellCallSession session) async {
+    final released = _released;
+    if (released != null) {
+      await released;
+      if (state?.session != session) return;
+    }
     final ok = await session.start();
     if (state?.session != session) return;
     if (ok) {
@@ -250,7 +260,9 @@ class DoorbellCallController extends StateNotifier<DoorbellCall?> {
     final call = state;
     if (call == null) return;
     state = null;
-    unawaited(call.session.dispose());
+    final previous = _released;
+    final release = call.session.dispose();
+    _released = previous == null ? release : Future.wait([previous, release]);
   }
 
   @override
