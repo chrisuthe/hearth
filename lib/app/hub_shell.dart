@@ -21,6 +21,7 @@ import '../screens/home/home_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../modules/alarm_clock/alarm_alert_overlay.dart';
 import '../modules/cameras/camera_feed_overlay.dart';
+import '../modules/cameras/doorbell/doorbell_call_overlay.dart';
 import '../modules/alarm_clock/alarm_service.dart';
 import '../modules/alarm_clock/sunrise_controller.dart';
 import '../modules/lists/lists_providers.dart';
@@ -552,9 +553,6 @@ class _HubShellState extends ConsumerState<HubShell> {
             // card. Renders nothing when closed.
             CameraFeedOverlay(onWake: _onUserActivity),
 
-            // Alarm alert — full-screen overlay when an alarm fires.
-            AlarmAlertOverlay(onWake: _onUserActivity),
-
             // DLNA cast — full-screen video overlay when a control point
             // casts a video to the kiosk. Renders nothing when idle.
             DlnaCastOverlay(onWake: _onUserActivity),
@@ -566,6 +564,15 @@ class _HubShellState extends ConsumerState<HubShell> {
             // Plex Live TV — full-screen video overlay while a channel is
             // tuning/playing (client-initiated). Renders nothing when idle.
             LiveTvOverlay(onWake: _onUserActivity),
+
+            // Doorbell call — live doorbell video with Talk and Hang up,
+            // opened by a ring on Android. Above the casts, so a cast that
+            // starts mid-call can't hide a live microphone.
+            DoorbellCallOverlay(onWake: _onUserActivity),
+
+            // Alarm alert — full-screen overlay when an alarm fires. Topmost,
+            // so it stays above a doorbell call and the casts.
+            AlarmAlertOverlay(onWake: _onUserActivity),
           ],
         ),
       ),

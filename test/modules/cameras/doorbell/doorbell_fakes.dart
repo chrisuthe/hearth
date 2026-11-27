@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
+import 'package:hearth/models/hearth_notification.dart';
+import 'package:hearth/modules/cameras/doorbell/doorbell_call_controller.dart';
+import 'package:hearth/modules/cameras/doorbell/doorbell_call_session.dart';
 import 'package:hearth/modules/cameras/doorbell/doorbell_platform.dart';
 import 'package:hearth/modules/cameras/doorbell/rtc_client.dart';
 
@@ -103,4 +106,41 @@ class FakeRtcClient implements RtcClient {
     talkLinks.add(link);
     return link;
   }
+}
+
+/// A controller over real sessions with fake media and platform, for widget
+/// tests. [foreground] is always true.
+class FakeDoorbellRig {
+  FakeDoorbellRig() {
+    controller = DoorbellCallController(
+      createSession: (camera, {onLost, onTalkLost}) => DoorbellCallSession(
+        signaling: Uri.parse('ws://10.0.2.2:1984/api/ws?src=$camera'),
+        rtc: rtc,
+        platform: platform,
+        muteHearthPlayback: (_) {},
+        onLost: onLost,
+        onTalkLost: onTalkLost,
+      ),
+      platform: platform,
+      isForeground: () => true,
+      closeFeed: () {},
+      fallbackToFeed: (_) {},
+    );
+  }
+
+  final log = CallLog();
+  late final rtc = FakeRtcClient(log);
+  late final platform = FakeDoorbellPlatform(log);
+  late final DoorbellCallController controller;
+
+  /// Opens a call for [camera] as a ring would.
+  void ring({String camera = 'FrontDoorbell'}) => controller.ring(
+        HearthNotification.fromIngest({
+          'tag': 'front_doorbell',
+          'title': 'Doorbell rang at Front Door',
+          'camera': camera,
+          'timeout': 180,
+          'ring': true,
+        })!,
+      );
 }

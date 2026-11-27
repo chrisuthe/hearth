@@ -12,6 +12,8 @@ import 'package:hearth/modules/alarm_clock/alarm_models.dart';
 import 'package:hearth/modules/alarm_clock/alarm_service.dart';
 import 'package:hearth/modules/alarm_clock/sunrise_controller.dart';
 import 'package:hearth/modules/cameras/camera_feed_overlay.dart';
+import 'package:hearth/modules/cameras/doorbell/doorbell_call_controller.dart';
+import 'package:hearth/modules/cameras/doorbell/doorbell_call_overlay.dart';
 import 'package:hearth/modules/cameras/frigate_service.dart';
 import 'package:hearth/modules/livetv/live_tv_overlay.dart';
 import 'package:hearth/services/dlna/dlna_cast_overlay.dart';
@@ -29,6 +31,7 @@ import 'package:hearth/services/video/hearth_video_player.dart';
 import 'package:hearth/widgets/notification_deck_overlay.dart';
 import 'package:hearth/widgets/notification_picture.dart';
 
+import '../modules/cameras/doorbell/doorbell_fakes.dart';
 import 'module_support.dart' show FakeHomeAssistant;
 import 'portrait_fixtures.dart';
 import 'portrait_harness.dart';
@@ -149,6 +152,45 @@ void main() {
       expect(close.bottom, lessThanOrEqualTo(canvas.height));
       await unmount(tester);
     });
+  });
+
+  group('Doorbell call', () {
+    for (final talking in [false, true]) {
+      testLayoutsAndSplitHalves(
+          talking ? 'talking, long camera name' : 'listening',
+          (tester, canvas) async {
+        final rig = FakeDoorbellRig();
+        await _pumpOverlay(
+          tester,
+          DoorbellCallOverlay(onWake: () {}),
+          overrides: [
+            doorbellCallProvider.overrideWith((ref) => rig.controller),
+          ],
+        );
+        rig.ring(camera: talking
+            ? 'back_yard_north_fence_doorbell_with_a_very_long_name'
+            : 'FrontDoorbell');
+        await tester.pump();
+        await tester.pump();
+        if (talking) {
+          await tester.tap(find.byKey(const Key('doorbell-talk')));
+          await tester.pump();
+          await tester.pump();
+          expect(find.text('Talking'), findsOneWidget);
+        }
+
+        final talk = tester.getRect(find.byKey(const Key('doorbell-talk')));
+        final hangUp =
+            tester.getRect(find.byKey(const Key('doorbell-hangup')));
+        expect(talk.height, greaterThanOrEqualTo(96));
+        expect(hangUp.bottom, lessThanOrEqualTo(canvas.height));
+        expect(talk.overlaps(hangUp), isFalse);
+
+        rig.controller.hangUp();
+        await unmount(tester);
+        await tester.pump(const Duration(minutes: 6));
+      });
+    }
   });
 
   group('Camera feed', () {
