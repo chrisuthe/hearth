@@ -20,22 +20,29 @@ import 'frigate_service.dart';
 /// left open can't play unattended on the display.
 const Duration kCameraFeedMaxDuration = Duration(minutes: 5);
 
+/// How long a [CameraFeedRequest.notice] shows over the feed.
+const Duration kFeedNoticeDuration = Duration(seconds: 4);
+
 /// A request to show [camera]'s live feed, with the [frame] to show until video
-/// appears.
+/// appears and an optional [notice] shown briefly over it.
 class CameraFeedRequest {
   final String camera;
   final Uint8List? frame;
 
-  const CameraFeedRequest({required this.camera, this.frame});
+  /// Shown for [kFeedNoticeDuration]. The toast layer sits below this overlay,
+  /// so a message about the feed itself is drawn here.
+  final String? notice;
+
+  const CameraFeedRequest({required this.camera, this.frame, this.notice});
 }
 
 /// Whether a camera feed is open. Only one feed runs at a time.
 class CameraFeedController extends StateNotifier<CameraFeedRequest?> {
   CameraFeedController() : super(null);
 
-  void open(String camera, {Uint8List? frame}) {
+  void open(String camera, {Uint8List? frame, String? notice}) {
     if (state != null) return;
-    state = CameraFeedRequest(camera: camera, frame: frame);
+    state = CameraFeedRequest(camera: camera, frame: frame, notice: notice);
   }
 
   void close() => state = null;
@@ -85,7 +92,9 @@ class _FeedViewState extends ConsumerState<_FeedView> {
   HearthVideoPlayer? _player;
   Timer? _maxDuration;
   Timer? _stallWatchdog;
+  Timer? _noticeTimer;
   int _unhealthyPolls = 0;
+  bool _showNotice = false;
 
   String get _camera => widget.request.camera;
 
@@ -93,6 +102,12 @@ class _FeedViewState extends ConsumerState<_FeedView> {
   void initState() {
     super.initState();
     _idle = ref.read(idleControllerProvider);
+    if (widget.request.notice != null) {
+      _showNotice = true;
+      _noticeTimer = Timer(kFeedNoticeDuration, () {
+        if (mounted) setState(() => _showNotice = false);
+      });
+    }
     // After the frame, so an expanded camera screen has already collapsed: that
     // releases its decoder and unsuppresses idle, which must not undo ours.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -104,6 +119,7 @@ class _FeedViewState extends ConsumerState<_FeedView> {
   void dispose() {
     _maxDuration?.cancel();
     _stallWatchdog?.cancel();
+    _noticeTimer?.cancel();
     _player?.dispose();
     _idle.unsuppress();
     super.dispose();
@@ -212,6 +228,13 @@ class _FeedViewState extends ConsumerState<_FeedView> {
                 child: _CameraLabel(name: _camera),
               ),
             ),
+            if (_showNotice)
+              Positioned(
+                left: HearthSpacing.x4,
+                right: HearthSpacing.x4,
+                bottom: HearthSpacing.x6,
+                child: Center(child: FeedNotice(widget.request.notice!)),
+              ),
           ],
         ),
       ),
@@ -247,6 +270,42 @@ class _CameraLabel extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                   fontSize: 14, color: Colors.white70), // theme-exempt: video
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A short message over live video, in place of a toast the overlay would
+/// hide.
+class FeedNotice extends StatelessWidget {
+  final String message;
+
+  const FeedNotice(this.message, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: HearthSpacing.x4, vertical: HearthSpacing.x2),
+      decoration: BoxDecoration(
+        color: Colors.black87, // theme-exempt: video
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.videocam_off,
+              size: HearthIcon.sm, color: Colors.white70), // theme-exempt: video
+          const SizedBox(width: HearthSpacing.x2),
+          Flexible(
+            child: Text(
+              message,
+              style: const TextStyle(
+                  fontSize: HearthFont.body,
+                  color: Colors.white), // theme-exempt: video
             ),
           ),
         ],

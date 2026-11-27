@@ -26,6 +26,8 @@ import 'services/timer_service.dart';
 import 'services/voice_ducker.dart';
 import 'services/voice_satellite_bridge.dart';
 import 'services/audio_coordinator.dart';
+import 'modules/cameras/doorbell/doorbell_call_controller.dart';
+import 'modules/cameras/doorbell/doorbell_support.dart';
 import 'services/video/media_kit_player.dart';
 import 'services/video/gstreamer_player.dart';
 // media_kit uses native libmpv — not available on web.
@@ -151,6 +153,9 @@ Future<void> main() async {
     // App launcher: brings Hearth forward over a launched app when anything
     // would wake it. Listens without frames, so it must start at boot.
     if (androidAppsSupported) container.read(foregroundSummonerProvider);
+    // Doorbell call view: listens for rings without frames, so it must
+    // start at boot too.
+    if (doorbellCallSupported) container.read(doorbellCallProvider);
   }
 
   // Eager-load AlarmService so persisted alarms are loaded and the
