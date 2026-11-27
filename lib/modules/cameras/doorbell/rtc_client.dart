@@ -77,12 +77,20 @@ class FlutterWebrtcClient implements RtcClient {
     'video': false,
   };
 
-  static Future<void> _initialize() => _initialized ??= WebRTC.initialize(
-        options: {
-          'androidAudioConfiguration': AndroidAudioConfiguration.media.toMap(),
-          'androidUseHardwareAudioProcessing': false,
-        },
-      );
+  static Future<void> _initialize() => _initialized ??= () async {
+        await WebRTC.initialize(
+          options: {
+            'androidAudioConfiguration':
+                AndroidAudioConfiguration.media.toMap(),
+            'androidUseHardwareAudioProcessing': false,
+          },
+        );
+        // The option above only sets the audio module's attributes. The
+        // plugin's audio switch keeps its own defaults (communication mode,
+        // voice-call stream) until it is told otherwise.
+        await Helper.setAndroidAudioConfiguration(
+            AndroidAudioConfiguration.media);
+      }();
 
   @override
   Future<RtcReceiveLink> receive(Uri signaling,
@@ -150,7 +158,7 @@ class FlutterWebrtcClient implements RtcClient {
 
     try {
       pc = await createPeerConnection({'bundlePolicy': 'max-bundle'});
-      final transceiver = await pc.addTransceiver(
+      await pc.addTransceiver(
         track: track,
         kind: RTCRtpMediaType.RTCRtpMediaTypeAudio,
         init: RTCRtpTransceiverInit(
@@ -159,8 +167,13 @@ class FlutterWebrtcClient implements RtcClient {
       link = _WebrtcLink(pc, onClose: releaseMic);
       await _negotiate(pc, signaling, timeout, link);
       // As the Advanced Camera Card checks: a doorbell without a backchannel
-      // connects but never takes the audio.
-      final direction = await transceiver.getCurrentDirection();
+      // connects but never takes the audio. Read the transceiver afresh:
+      // flutter_webrtc disposes the one addTransceiver returned once the
+      // answer is applied.
+      final transceivers = await pc.getTransceivers();
+      final direction = transceivers.isEmpty
+          ? null
+          : await transceivers.first.getCurrentDirection();
       if (direction != TransceiverDirection.SendOnly &&
           direction != TransceiverDirection.SendRecv) {
         throw const RtcUnavailable('no two-way audio');
@@ -263,8 +276,10 @@ class FlutterWebrtcClient implements RtcClient {
     } catch (e) {
       throw RtcUnavailable('$e');
     } finally {
-      await sub.cancel();
+      // Neither is awaited: cancelling the message stream waits on the
+      // socket, which go2rtc keeps open, and nothing here needs either done.
       unawaited(signaling.close().catchError((_) {}));
+      unawaited(sub.cancel());
     }
   }
 }

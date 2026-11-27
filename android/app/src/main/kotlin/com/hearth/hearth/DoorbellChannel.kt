@@ -62,6 +62,7 @@ class DoorbellChannel(
     }
 
     private fun begin() {
+        Log.i(TAG, "Call hold taken: satellite capture paused, Sendspin muted, screen kept on")
         active = true
         HearthAudioService.setCallActive(true)
         activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -69,6 +70,7 @@ class DoorbellChannel(
 
     private fun end() {
         if (!active) return
+        Log.i(TAG, "Call hold released")
         active = false
         HearthAudioService.setCallActive(false)
         activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
