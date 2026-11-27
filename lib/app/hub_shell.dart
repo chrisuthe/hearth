@@ -21,6 +21,7 @@ import '../screens/home/home_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../modules/alarm_clock/alarm_alert_overlay.dart';
 import '../modules/cameras/camera_feed_overlay.dart';
+import '../modules/cameras/doorbell/doorbell_call_controller.dart';
 import '../modules/cameras/doorbell/doorbell_call_overlay.dart';
 import '../modules/alarm_clock/alarm_service.dart';
 import '../modules/alarm_clock/sunrise_controller.dart';
@@ -354,6 +355,19 @@ class _HubShellState extends ConsumerState<HubShell> {
   Widget build(BuildContext context) {
     final config = ref.watch(hubConfigProvider);
     final idleController = ref.read(idleControllerProvider);
+
+    // The call view lives in this route's overlay stack, so anything pushed
+    // over it (a menu module, the timer) would hide a live doorbell call.
+    ref.listen(doorbellCallProvider, (previous, next) {
+      if (previous != null || next == null) return;
+      if (_menu1Open || _menu2Open) {
+        setState(() {
+          _menu1Open = false;
+          _menu2Open = false;
+        });
+      }
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    });
 
     final layout = ref.watch(shellLayoutProvider);
     final leftModules = layout.left;
