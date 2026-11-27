@@ -123,6 +123,7 @@ Every field is optional **except** that you must send at least one of `title` or
 | `tag` | string | Stable identity. Sending the same `tag` again updates the existing card instead of adding one. |
 | `clear` | `true` | With `tag`: closes that card. No title or message needed. |
 | `timeout` | seconds | Closes the card this long after its last update. Takes precedence over `sticky`. A card with `image_refresh` and no `timeout` gets 10 minutes. |
+| `ring` | `true` | A doorbell press. With `camera`, an Android Hearth opens the [doorbell call view](#doorbell-call-view-android) straight away, and shows the card even if it was dismissed. Ignored without `camera`, and everywhere except Android. |
 
 ## Pictures and camera cards
 
@@ -208,6 +209,62 @@ actions:
 ```
 
 The card closes about 30 seconds after the person leaves.
+
+## Doorbell call view (Android)
+
+On an [[Android Tablet]], a doorbell press can open the doorbell's live video
+**with its sound**, so whoever is in the room hears the visitor at once and can
+answer without going for a phone. Add `"ring": true` and the `camera` to the
+message your automation sends when the button is pressed:
+
+```json
+{"tag": "front_doorbell",
+ "title": "Doorbell rang at Front Door",
+ "image": "/api/camera_proxy/camera.frontdoorbell",
+ "image_refresh": 3,
+ "camera": "FrontDoorbell",
+ "source": "frigate",
+ "timeout": 180,
+ "ring": true}
+```
+
+Send `ring` once per press, on the visitor sensor turning on. Don't repeat it in a
+heartbeat: every `ring` counts as a new press. It can share its `tag` with your
+person-detected card, which it then updates.
+
+**What you see.** The view fills the screen with the live video and the camera's
+name, and plays the doorbell's sound from the tablet's speaker at the media volume.
+It turns the screen on and brings Hearth to the front if another app is open,
+which needs **Display over other apps** for Hearth. Without that, you get the card
+and a system notification, and no sound plays until you open Hearth.
+
+- **Talk** turns the tablet's microphone on and sends it to the doorbell. Tap it
+  again to stop. The doorbell keeps playing while you talk. The microphone is
+  never on unless Talk is.
+- **Hang up** closes the view and turns the microphone off. A tap on the video
+  does not close it.
+
+**While the view is open**, Hearth's own music and casts are muted, and the voice
+satellite stops listening for its wake word, so the doorbell can't wake it. Both come
+back when the view closes. Talk works even when the satellite's microphone is
+muted, because tapping it is a choice made by someone in the room; the mute setting
+doesn't change.
+
+**When it closes.** If nobody tapped Talk, it closes after the message's `timeout`
+(3 minutes without one), or when a `clear` for its `tag` arrives. Once Talk has been
+used, it stays up to 5 minutes from when it opened, and a `clear` no longer closes
+it. It also closes when Hearth leaves the screen. A press on another doorbell
+replaces the view, unless you're talking.
+
+**Requirements.** The camera must be a **Frigate** camera whose go2rtc stream has
+the same name, and go2rtc must be reachable from the tablet on ports `1984` (its
+API) and `8555` (WebRTC). Talk also needs the doorbell's two-way audio set up in
+go2rtc (a backchannel source); without it, Talk shows **Talk unavailable** and the
+view keeps listening. If the live connection can't be made within 5 seconds, Hearth
+falls back to the ordinary listen-only feed and shows **Talk unavailable**.
+
+On the Pi, `ring` changes nothing: the card works as described above, and
+tapping it opens the listen-only feed.
 
 ## On the kiosk
 
