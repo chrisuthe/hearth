@@ -149,4 +149,36 @@ void main() {
     duck.add(true);
     expect(playback.value, 1.0);
   });
+  group('doorbell call', () {
+    test('call mutes playback', () {
+      coordinator.setCallActive(true);
+      expect(playback.value, 0.0);
+    });
+
+    test('a voice duck during a call stays at 0', () {
+      coordinator.setCallActive(true);
+      duck.add(true);
+      status.add(_live('listening'));
+      expect(playback.value, 0.0);
+    });
+
+    test('ending the call restores normal playback', () {
+      coordinator.setCallActive(true);
+      coordinator.setCallActive(false);
+      expect(playback.value, 1.0);
+    });
+
+    test('ending the call while voice is active ducks', () {
+      coordinator.setCallActive(true);
+      duck.add(true);
+      coordinator.setCallActive(false);
+      expect(playback.value, _duckLevel);
+    });
+
+    test('dispose restores normal playback', () {
+      coordinator.setCallActive(true);
+      coordinator.dispose();
+      expect(playback.value, 1.0);
+    });
+  });
 }
