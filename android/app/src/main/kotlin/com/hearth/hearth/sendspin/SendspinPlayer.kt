@@ -136,6 +136,15 @@ class SendspinPlayer(
     var running = false
         private set
 
+    /**
+     * Mutes the output while a doorbell call is open. Uses the engine's VOICE
+     * reason, which the engine keeps for every later player; Hearth sets it
+     * nowhere else.
+     */
+    fun setCallMuted(muted: Boolean) {
+        engine.setMuted(SyncAudioPlayer.MuteReason.VOICE, muted)
+    }
+
     fun start() {
         if (config.serverUrl.isNotBlank()) {
             // Advertising and dialling are exclusive, and dialling is not built yet.

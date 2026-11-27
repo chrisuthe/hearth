@@ -18,6 +18,7 @@ import com.example.ava.wakewords.providers.AssetWakeWordProvider
 import com.example.esphomeproto.api.VoiceAssistantFeature
 import com.example.esphomeproto.api.deviceInfoResponse
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlin.coroutines.CoroutineContext
 
@@ -82,7 +83,12 @@ class SatelliteBuilder(private val context: Context) {
                 VoiceEvents.settingChanged("wakeWords", it)
             },
             activeStopWords = SettingState(settings.stopWords) { settings.stopWords.value = it },
-            muted = SettingState(settings.muted) { settings.muted.value = it },
+            // Ava stops and releases the microphone while this is true, so a
+            // doorbell call holds it off without touching the mute setting
+            // that Home Assistant sees.
+            muted = SettingState(
+                combine(settings.muted, HearthAudioService.callActive) { muted, held -> muted || held },
+            ) { settings.muted.value = it },
         )
         return EspHomeDevice(
             coroutineContext = coroutineContext,

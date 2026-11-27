@@ -36,6 +36,7 @@ import com.hearth.hearth.sendspin.SendspinPlayer
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -196,7 +197,11 @@ class HearthAudioService : LifecycleService() {
         sendspin = SendspinPlayer(this, config, version) { status ->
             sendspinStatus = status
             updateNotification()
-        }.also { it.start() }
+        }.also {
+            // A Sendspin started during a doorbell call starts muted.
+            it.setCallMuted(callActive.value)
+            it.start()
+        }
     }
 
     /** The Sendspin player, for the channel. Null while Sendspin is off. */
@@ -410,6 +415,20 @@ class HearthAudioService : LifecycleService() {
         fun setMuted(muted: Boolean) {
             this.muted = muted
             instance?.applyMuted(muted)
+        }
+
+        /**
+         * A doorbell call is open. The satellite stops capturing (see
+         * [SatelliteBuilder]) and Sendspin is muted while it is true. Neither
+         * [muted] nor the Home Assistant mute switch changes. Process-wide, so
+         * a device built or a Sendspin started mid-call honours it too.
+         */
+        val callActive = MutableStateFlow(false)
+
+        /** Main thread only, like the Sendspin player. */
+        fun setCallActive(active: Boolean) {
+            callActive.value = active
+            instance?.sendspinPlayer?.setCallMuted(active)
         }
 
         /** A feature's latest request, not yet taken by the service. */
