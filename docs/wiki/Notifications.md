@@ -244,8 +244,9 @@ and a system notification, and no sound plays until you open Hearth.
 - **Hang up** closes the view and turns the microphone off. A tap on the video
   does not close it.
 
-**While the view is open**, Hearth's own music and casts are muted, and the voice
-satellite stops listening for its wake word, so the doorbell can't wake it. Both come
+**While the view is open**, Hearth's own music and casts are muted, and so are the
+voice satellite's replies and announcements. The satellite also stops listening for
+its wake word, so the doorbell can't wake it. Both come
 back when the view closes. Talk works even when the satellite's microphone is
 muted, because tapping it is a choice made by someone in the room; the mute setting
 doesn't change.
