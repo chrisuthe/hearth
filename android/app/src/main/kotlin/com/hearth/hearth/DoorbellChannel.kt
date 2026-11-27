@@ -7,6 +7,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
@@ -32,6 +34,14 @@ class DoorbellChannel(
 ) : MethodChannel.MethodCallHandler {
     private val channel = MethodChannel(messenger, "com.hearth/doorbell")
     private var active = false
+    private val main = Handler(Looper.getMainLooper())
+
+    /** The ring's screen flags outlast neither its call nor its summon. */
+    private val clearScreenFlags = Runnable {
+        if (active) return@Runnable
+        activity.setTurnScreenOn(false)
+        activity.setShowWhenLocked(false)
+    }
 
     init {
         channel.setMethodCallHandler(this)
@@ -41,6 +51,7 @@ class DoorbellChannel(
     fun dispose() {
         channel.setMethodCallHandler(null)
         end()
+        main.removeCallbacks(clearScreenFlags)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -74,10 +85,16 @@ class DoorbellChannel(
         active = false
         HearthAudioService.setCallActive(false)
         activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Left set, Hearth would show over the lock screen from then on.
+        clearScreenFlags.run()
     }
 
     private fun summon(title: String) {
         wakeScreen()
+        // Dart waits this long for Hearth to come forward; a call that opens
+        // in time keeps the flags until it ends.
+        main.removeCallbacks(clearScreenFlags)
+        main.postDelayed(clearScreenFlags, SUMMON_WINDOW_MS)
         if (MainActivity.visible) return
         if (Settings.canDrawOverlays(activity)) {
             activity.startActivity(AppSessionService.frontIntent(activity))
@@ -133,5 +150,6 @@ class DoorbellChannel(
         const val CHANNEL_ID = "doorbell"
         const val NOTIFICATION_ID = 315
         const val WAKE_MS = 10_000L
+        const val SUMMON_WINDOW_MS = 15_000L
     }
 }
