@@ -32,6 +32,8 @@ Full licence texts are in `assets/licenses/`. **Verified** means we read the lic
 | [Timber](#timber) | Apache-2.0 | android | verified |
 | [Protocol Buffers (Java and Kotlin lite runtimes)](#protobuf) | BSD-3-Clause | android | verified |
 | [libmpv and FFmpeg (media_kit native builds)](#libmpv) | LGPL-2.1-or-later | android, windows | assumed |
+| [WebRTC (flutter_webrtc native builds)](#webrtc) | BSD-3-Clause | android, windows | verified |
+| [AudioSwitch](#audioswitch) | Apache-2.0 | android | verified |
 | [Inter font](#inter) | OFL-1.1 | android, pi, linux, windows | verified |
 | [Weather Icons font](#weather-icons) | OFL-1.1 | android, pi, linux, windows | verified |
 | [Unicode CLDR Windows time zone mapping](#cldr-windows-zones) | Unicode-3.0 | android, pi, linux, windows | verified |
@@ -300,6 +302,30 @@ Linux desktop uses the system's libmpv and does not bundle it; the Pi does not u
 - Source: <https://github.com/media-kit/libmpv-android-video-build>
 - Platforms: android, windows
 - Status: **assumed**. Not confirmed: we have not read the build flags. mpv and FFmpeg are LGPL-2.1-or-later only when built without their GPL parts.
+
+<a id="webrtc"></a>
+## WebRTC (flutter_webrtc native builds)
+
+The doorbell call view's video, audio and microphone. flutter_webrtc pulls the prebuilt io.github.webrtc-sdk:android:150.7871.04 into the APK and downloads its prebuilt libwebrtc for the Windows build. Both are builds of WebRTC, which includes third-party libraries under their own licences; the webrtc-sdk/webrtc repository lists them.
+
+The Pi does not use it.
+
+- Licence: BSD-3-Clause (`assets/licenses/webrtc.txt`)
+- Source: <https://github.com/webrtc-sdk/webrtc>
+- Platforms: android, windows
+- Status: **verified**. Maven POM licence of io.github.webrtc-sdk:android 150.7871.04; LICENSE from webrtc.googlesource.com/src.
+
+<a id="audioswitch"></a>
+## AudioSwitch
+
+Copyright Twilio, Inc.
+
+Audio routing for flutter_webrtc on Android, from the fork davidliu/audioswitch.
+
+- Licence: Apache-2.0 (`assets/licenses/apache-2.0.txt`)
+- Source: <https://github.com/twilio/audioswitch>
+- Platforms: android
+- Status: **verified**. Maven POM licence of com.github.davidliu:audioswitch 039a35ae; LICENSE.txt in twilio/audioswitch.
 
 <a id="inter"></a>
 ## Inter font

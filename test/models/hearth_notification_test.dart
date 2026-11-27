@@ -100,5 +100,22 @@ void main() {
           HearthNotification.fromIngest({'title': 'x', 'priority': 'alert'})!;
       expect(alert.sticky, isTrue);
     });
+      test('ring is true only for a boolean true', () {
+      expect(HearthNotification.fromIngest({'title': 'x', 'ring': true})!.ring,
+          isTrue);
+      expect(
+          HearthNotification.fromIngest({'title': 'x', 'ring': 'true'})!.ring,
+          isFalse);
+      expect(HearthNotification.fromIngest({'title': 'x', 'ring': 1})!.ring,
+          isFalse);
+      expect(HearthNotification.fromIngest({'title': 'x'})!.ring, isFalse);
+    });
+
+    test('updating keeps ring', () {
+      final first = HearthNotification.fromIngest({'title': 'x', 'tag': 't'})!;
+      final next = HearthNotification.fromIngest(
+          {'title': 'y', 'tag': 't', 'ring': true})!;
+      expect(next.updating(first).ring, isTrue);
+    });
   });
 }

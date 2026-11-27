@@ -21,6 +21,8 @@ import '../screens/home/home_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../modules/alarm_clock/alarm_alert_overlay.dart';
 import '../modules/cameras/camera_feed_overlay.dart';
+import '../modules/cameras/doorbell/doorbell_call_controller.dart';
+import '../modules/cameras/doorbell/doorbell_call_overlay.dart';
 import '../modules/alarm_clock/alarm_service.dart';
 import '../modules/alarm_clock/sunrise_controller.dart';
 import '../modules/lists/lists_providers.dart';
@@ -354,6 +356,19 @@ class _HubShellState extends ConsumerState<HubShell> {
     final config = ref.watch(hubConfigProvider);
     final idleController = ref.read(idleControllerProvider);
 
+    // The call view lives in this route's overlay stack, so anything pushed
+    // over it (a menu module, the timer) would hide a live doorbell call.
+    ref.listen(doorbellCallProvider, (previous, next) {
+      if (previous != null || next == null) return;
+      if (_menu1Open || _menu2Open) {
+        setState(() {
+          _menu1Open = false;
+          _menu2Open = false;
+        });
+      }
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    });
+
     final layout = ref.watch(shellLayoutProvider);
     final leftModules = layout.left;
     final rightModules = layout.right;
@@ -552,9 +567,6 @@ class _HubShellState extends ConsumerState<HubShell> {
             // card. Renders nothing when closed.
             CameraFeedOverlay(onWake: _onUserActivity),
 
-            // Alarm alert — full-screen overlay when an alarm fires.
-            AlarmAlertOverlay(onWake: _onUserActivity),
-
             // DLNA cast — full-screen video overlay when a control point
             // casts a video to the kiosk. Renders nothing when idle.
             DlnaCastOverlay(onWake: _onUserActivity),
@@ -566,6 +578,15 @@ class _HubShellState extends ConsumerState<HubShell> {
             // Plex Live TV — full-screen video overlay while a channel is
             // tuning/playing (client-initiated). Renders nothing when idle.
             LiveTvOverlay(onWake: _onUserActivity),
+
+            // Doorbell call — live doorbell video with Talk and Hang up,
+            // opened by a ring on Android. Above the casts, so a cast that
+            // starts mid-call can't hide a live microphone.
+            DoorbellCallOverlay(onWake: _onUserActivity),
+
+            // Alarm alert — full-screen overlay when an alarm fires. Topmost,
+            // so it stays above a doorbell call and the casts.
+            AlarmAlertOverlay(onWake: _onUserActivity),
           ],
         ),
       ),

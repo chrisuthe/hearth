@@ -330,6 +330,36 @@
       "checked": "Not confirmed: we have not read the build flags. mpv and FFmpeg are LGPL-2.1-or-later only when built without their GPL parts"
     },
     {
+      "id": "webrtc",
+      "name": "WebRTC (flutter_webrtc native builds)",
+      "license": "BSD-3-Clause",
+      "licenseFile": "webrtc.txt",
+      "attribution": [
+        "The doorbell call view's video, audio and microphone. flutter_webrtc pulls the prebuilt io.github.webrtc-sdk:android:150.7871.04 into the APK and downloads its prebuilt libwebrtc for the Windows build. Both are builds of WebRTC, which includes third-party libraries under their own licences; the webrtc-sdk/webrtc repository lists them.",
+        "The Pi does not use it."
+      ],
+      "platforms": ["android", "windows"],
+      "source": "https://github.com/webrtc-sdk/webrtc",
+      "covers": [],
+      "status": "verified",
+      "checked": "Maven POM licence of io.github.webrtc-sdk:android 150.7871.04; LICENSE from webrtc.googlesource.com/src"
+    },
+    {
+      "id": "audioswitch",
+      "name": "AudioSwitch",
+      "license": "Apache-2.0",
+      "licenseFile": "apache-2.0.txt",
+      "attribution": [
+        "Copyright Twilio, Inc.",
+        "Audio routing for flutter_webrtc on Android, from the fork davidliu/audioswitch."
+      ],
+      "platforms": ["android"],
+      "source": "https://github.com/twilio/audioswitch",
+      "covers": [],
+      "status": "verified",
+      "checked": "Maven POM licence of com.github.davidliu:audioswitch 039a35ae; LICENSE.txt in twilio/audioswitch"
+    },
+    {
       "id": "inter",
       "name": "Inter font",
       "license": "OFL-1.1",

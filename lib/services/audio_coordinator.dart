@@ -34,6 +34,7 @@ class AudioCoordinator {
   StreamSubscription<VoiceSatelliteStatus>? _statusSub;
 
   bool _requested = false;
+  bool _callActive = false;
   VoiceSatelliteStatus _status = const VoiceSatelliteStatus();
 
   AudioCoordinator(this._playback);
@@ -53,6 +54,21 @@ class AudioCoordinator {
     _statusSub = status.listen(_onStatus);
   }
 
+  /// A doorbell call is open: Hearth's own playback goes silent, whatever
+  /// the voice satellite is doing, so it neither leaks into the call's
+  /// microphone nor drowns out the visitor.
+  void setCallActive(bool active) {
+    if (_callActive == active) return;
+    _callActive = active;
+    Log.i(
+      _tag,
+      active
+          ? 'Doorbell call → muting playback'
+          : 'Doorbell call ended → restoring playback',
+    );
+    _apply();
+  }
+
   void _onStatus(VoiceSatelliteStatus status) {
     final newHealth =
         status.health != null && !identical(status.health, _status.health);
@@ -66,23 +82,26 @@ class AudioCoordinator {
         _status.running &&
         _status.connected &&
         (_requested || _activeStates.contains(_status.state));
-    _set(active ? duckFactor : 1.0);
+    _set(_callActive ? 0.0 : (active ? duckFactor : 1.0));
   }
 
   void _set(double factor) {
     if (_playback.value == factor) return;
+    _playback.value = factor;
+    // setCallActive logs the call's own changes.
+    if (_callActive) return;
     Log.i(
       _tag,
       factor < 1.0
           ? 'Voice active → ducking playback'
           : 'Voice idle → restoring playback',
     );
-    _playback.value = factor;
   }
 
   void dispose() {
     _duckSub?.cancel();
     _statusSub?.cancel();
+    _callActive = false;
     _set(1.0);
   }
 }

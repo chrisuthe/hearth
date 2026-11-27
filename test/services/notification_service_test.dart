@@ -315,5 +315,89 @@ void main() {
         expect(service.notifications, isEmpty);
       });
     });
+    group('NotificationService rings', () {
+    Map<String, dynamic> ringPayload({bool ring = true}) => {
+          'tag': 'front_doorbell',
+          'title': 'Doorbell rang at Front Door',
+          'camera': 'FrontDoorbell',
+          'timeout': 180,
+          if (ring) 'ring': true,
+        };
+
+    NotificationService build({required bool honoured}) => NotificationService(
+          playChime: (_) async {},
+          honoursRing: (_) => honoured,
+        );
+
+    test('honoured ring bypasses a dismissed tag', () async {
+      final service = build(honoured: true);
+      addTearDown(service.dispose);
+      final rings = <HearthNotification>[];
+      service.rings.listen(rings.add);
+
+      service.ingestPayload(ringPayload(ring: false));
+      service.dismiss(HearthNotification.idForTag('front_doorbell'));
+      service.ingestPayload(ringPayload());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(service.notifications, hasLength(1));
+      expect(rings, hasLength(1));
+      expect(rings.single.camera, 'FrontDoorbell');
+    });
+
+    test('unhonoured ring keeps dismissed suppression', () async {
+      final service = build(honoured: false);
+      addTearDown(service.dispose);
+      final rings = <HearthNotification>[];
+      service.rings.listen(rings.add);
+
+      service.ingestPayload(ringPayload(ring: false));
+      service.dismiss(HearthNotification.idForTag('front_doorbell'));
+      service.ingestPayload(ringPayload());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(service.notifications, isEmpty);
+      expect(rings, isEmpty);
+    });
+
+    test('ring updating an existing card emits', () async {
+      final service = build(honoured: true);
+      addTearDown(service.dispose);
+      final rings = <HearthNotification>[];
+      service.rings.listen(rings.add);
+
+      service.ingestPayload(ringPayload(ring: false));
+      service.ingestPayload(ringPayload());
+      await Future<void>.delayed(Duration.zero);
+
+      expect(service.notifications, hasLength(1));
+      expect(service.notifications.single.id, 'tag-front_doorbell');
+      expect(rings, hasLength(1));
+    });
+
+    test('clear emits the tag', () async {
+      final service = build(honoured: true);
+      addTearDown(service.dispose);
+      final clears = <String>[];
+      service.clears.listen(clears.add);
+
+      service.ingestPayload({'tag': 'front_doorbell', 'clear': true});
+      await Future<void>.delayed(Duration.zero);
+
+      expect(clears, ['front_doorbell']);
+    });
+
+    test('payload without ring never emits on rings', () async {
+      final service = build(honoured: true);
+      addTearDown(service.dispose);
+      final rings = <HearthNotification>[];
+      service.rings.listen(rings.add);
+
+      service.ingestPayload(ringPayload(ring: false));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(rings, isEmpty);
+    });
   });
+});
 }

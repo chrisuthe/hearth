@@ -188,6 +188,19 @@ void main() {
     await finish(tester, c);
   });
 
+  testWidgets('shows a notice for a few seconds', (tester) async {
+    final c = await pump(tester);
+    feed(c).open('FrontDoorbell', notice: 'Talk unavailable');
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('Talk unavailable'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 5));
+    expect(find.text('Talk unavailable'), findsNothing);
+    expect(c.read(cameraFeedProvider), isNotNull);
+    await finish(tester, c);
+  });
+
   testWidgets('stays open past 4 minutes 59', (tester) async {
     final c = await pump(tester);
     feed(c).open('front_door');

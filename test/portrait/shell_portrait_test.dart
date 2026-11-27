@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hearth/modules/cameras/doorbell/doorbell_call_controller.dart';
 import 'package:hearth/app/current_screen_provider.dart';
 import 'package:hearth/app/hub_shell.dart';
 import 'package:hearth/app/page_indicator.dart';
@@ -17,6 +18,7 @@ import 'package:hearth/services/timer_service.dart';
 import 'package:hearth/services/voice_assistant_service.dart';
 import 'package:hearth/services/weather_service.dart';
 
+import '../modules/cameras/doorbell/doorbell_fakes.dart';
 import 'portrait_fixtures.dart';
 import 'portrait_harness.dart';
 
@@ -64,6 +66,7 @@ Future<void> _pumpShell(
   NotificationService? notifications,
   VoiceAssistantState voice = const VoiceAssistantState(),
   SunriseController? sunrise,
+  List<Override> extra = const [],
 }) async {
   final deck = notifications ?? silentNotifications();
   final timers = TimerService()
@@ -82,6 +85,7 @@ Future<void> _pumpShell(
       voiceAssistantStateProvider.overrideWith((ref) => Stream.value(voice)),
       if (sunrise != null)
         sunriseControllerProvider.overrideWith((ref) => sunrise),
+      ...extra,
     ],
     // The observer as HearthApp registers it, so pushed routes publish.
     child: Consumer(
@@ -182,6 +186,32 @@ void main() {
     expect(container.read(currentPageProvider), 'settings');
     expect(container.read(currentScreenProvider).id, 'settings');
     await unmount(tester);
+  });
+
+  testLayouts('HubShell pops a pushed route when a doorbell call opens',
+      (tester, canvas) async {
+    final rig = FakeDoorbellRig();
+    await _pumpShell(tester, extra: [
+      doorbellCallProvider.overrideWith((ref) => rig.controller),
+    ]);
+    final container = ProviderScope.containerOf(
+        tester.element(find.byType(HubShell)));
+    await _swipeFromEdge(tester, canvas, top: false);
+    await tester.tap(find.text('Controls'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(container.read(currentPageProvider), 'route:controls');
+
+    rig.ring();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(container.read(currentPageProvider), isNot('route:controls'));
+    expect(find.byKey(const Key('doorbell-talk')).hitTestable(), findsOneWidget);
+    rig.controller.hangUp();
+    await unmount(tester);
+    await tester.pump(const Duration(minutes: 6));
   });
 
   testLayouts('HubShell on Home with the page indicator',

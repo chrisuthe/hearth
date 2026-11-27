@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/hub_config.dart';
 import '../models/hearth_notification.dart';
 import '../utils/logger.dart';
+import '../modules/cameras/doorbell/doorbell_support.dart';
 import 'android_sounds.dart';
 import 'display_mode_service.dart';
 
@@ -28,9 +29,11 @@ class NotificationService extends ChangeNotifier {
   NotificationService({
     Future<void> Function(HearthNotification)? playChime,
     bool Function()? isChimeSuppressed,
+    bool Function(HearthNotification)? honoursRing,
     Duration transientLifetime = kTransientNotificationLifetime,
   })  : _playChime = playChime ?? _defaultPlayChime,
         _isChimeSuppressed = isChimeSuppressed ?? (() => false),
+        _honoursRing = honoursRing ?? ((_) => false),
         _transientLifetime = transientLifetime;
 
   final List<HearthNotification> _notifications = [];
@@ -42,7 +45,17 @@ class NotificationService extends ChangeNotifier {
   final Map<String, Timer> _dismissedTags = {};
   final Future<void> Function(HearthNotification) _playChime;
   final bool Function() _isChimeSuppressed;
+  final bool Function(HearthNotification) _honoursRing;
   final Duration _transientLifetime;
+  final _rings = StreamController<HearthNotification>.broadcast();
+  final _clears = StreamController<String>.broadcast();
+
+  /// Doorbell presses this device acts on: a `ring` that [_honoursRing]
+  /// accepted, after its card is shown.
+  Stream<HearthNotification> get rings => _rings.stream;
+
+  /// Tags closed by a `clear` payload.
+  Stream<String> get clears => _clears.stream;
 
   /// Active notifications, oldest first → newest last (the deck stacks newest
   /// at the bottom, closest to the hand).
@@ -57,8 +70,11 @@ class NotificationService extends ChangeNotifier {
   ///
   /// A tagged card updates in place with no chime, and an update for a tag the
   /// user dismissed is dropped without notifying, so it can't wake the screen.
+  /// An honoured ring is a fresh press, so it forgets that dismissal first.
   void ingest(HearthNotification notification) {
     final tag = notification.tag;
+    final ring = notification.ring && _honoursRing(notification);
+    if (ring && tag != null) _dismissedTags.remove(tag)?.cancel();
     if (tag != null && _dismissedTags.containsKey(tag)) {
       _rememberDismissedTag(tag, notification.timeout);
       return;
@@ -72,6 +88,7 @@ class NotificationService extends ChangeNotifier {
       _notifications[existing] = notification.updating(_notifications[existing]);
       notifyListeners();
       _armAutoDismiss(notification);
+      if (ring) _rings.add(notification);
       return;
     }
     if (existing >= 0) {
@@ -90,6 +107,7 @@ class NotificationService extends ChangeNotifier {
     }
 
     _armAutoDismiss(notification);
+    if (ring) _rings.add(notification);
   }
 
   /// Normalize an inbound MQTT or HTTP payload and act on it: `clear: true`
@@ -112,6 +130,7 @@ class NotificationService extends ChangeNotifier {
   void clear(String tag) {
     _dismissedTags.remove(tag)?.cancel();
     _remove(HearthNotification.idForTag(tag));
+    _clears.add(tag);
   }
 
   /// Remove one notification by id, as the user dismissing it. Idempotent — a
@@ -180,6 +199,8 @@ class NotificationService extends ChangeNotifier {
       timer.cancel();
     }
     _dismissedTags.clear();
+    _rings.close();
+    _clears.close();
     super.dispose();
   }
 
@@ -239,5 +260,9 @@ final notificationServiceProvider =
           ref.read(displayModeServiceProvider).resolveMode(config: config);
       return mode == DisplayMode.night;
     },
+    honoursRing: (n) =>
+        doorbellCallSupported &&
+        n.camera != null &&
+        ref.read(hubConfigProvider).frigateUrl.isNotEmpty,
   );
 });
